@@ -1,0 +1,13 @@
+{
+    "workflow": "survivor",
+    "outdir": "./results",
+    "bind_paths": "/dataB/aux,/home/ywolberg,/dataG/ddd,/dataG/ddd-2023",
+    "runOptions": "",
+    "canoes_dir": "./results/out_CANOES/vcfs",
+    "clamms_dir": "./results/out_CLAMMS/vcfs",
+    "xhmm_dir": "./results/out_XHMM",
+    "cnvkit_dir": "./results/out_CNVKIT/vcfs",
+    "gcnv_dir": "./results/out_GCNV/vcfs",
+    "dragen_dir": "./results/out_DRAGEN/vcfs",
+    "indelible_dir": "./results/out_INDELIBLE/vcfs"
+}

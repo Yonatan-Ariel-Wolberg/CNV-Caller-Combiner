@@ -1,0 +1,23 @@
+Bootstrap: docker
+From: quay.io/condaforge/mambaforge:24.9.2-0
+
+%labels
+    software="train-xgboost-deps"
+    software.version="mambaforge-24.9.2-0"
+    about.summary="Prebuilt image for nf-multicaller-exomecnv train workflow"
+    about.license="BSD-3-Clause"
+    about.tags="xgboost, scikit-learn, imbalanced-learn, pandas, numpy"
+
+%post
+    mamba install -y -n base -c conda-forge \
+      xgboost=2.1.4 \
+      scikit-learn=1.6.1 \
+      imbalanced-learn=0.13.0 \
+      pandas=2.2.3 \
+      numpy=2.2.3 \
+    && mamba clean -afy
+
+    mkdir -p /workspace
+
+%environment
+    export WORKDIR=/workspace

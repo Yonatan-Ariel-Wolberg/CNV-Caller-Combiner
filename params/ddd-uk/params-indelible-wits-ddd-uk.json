@@ -1,0 +1,11 @@
+{
+    "workflow": "indelible",
+    "outdir": "./results",
+    "bind_paths": "/spaces,/dataG,/home/ywolberg,/dataB/aux,/dataG/ddd,/dataG/ddd-2023",
+    "runOptions": "",
+    "crams": "/spaces/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/crams",
+    "ref": "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa",
+    "fai": "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai",
+    "priors": "/dataG/ddd/data/resources/indelible/Indelible_db_10k.hg38.bed",
+    "indelible_conf": "/dataB/aux/indelible/indelible_config.json"
+}

@@ -1,0 +1,40 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Nextflow work directories and caches
+work/
+.nextflow/
+.nextflow.log*
+results/
+
+# Singularity Containers
+*.sif
+**/*.sif
+**/**/*.sif
+
+
+#Ignore insiders AI rules
+.github/instructions/codacy.instructions.md
+
+# Ignore SLURM output files
+slurm-*.out
+slurm-*.err
+
+# Ignore test files
+test_output/
+test_data_*/
+
+Ignore VCF files
+*.vcf
+*.vcf.gz
+**/*.vcf.gz
+**/*.vcf
+**/**/*.vcf.gz
+**/**/*.vcf
+**/**/**/*.vcf.gz
+**/**/**/*.vcf
+
+Ignore Nested Work
+.nested_*

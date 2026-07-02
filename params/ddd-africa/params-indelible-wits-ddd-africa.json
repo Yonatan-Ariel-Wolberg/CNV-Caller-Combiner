@@ -1,0 +1,11 @@
+{
+    "workflow": "indelible",
+    "outdir": "./results",
+    "bind_paths": "/dataB/aux,/home/ywolberg,/dataG/ddd,/dataG/ddd-2023",
+    "runOptions": "",
+    "crams": "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/{Extended,Father,Mother,Proband}",
+    "ref": "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa",
+    "fai": "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai",
+    "priors": "/dataG/ddd/data/resources/indelible/Indelible_db_10k.hg38.bed",
+    "indelible_conf": "/dataB/aux/indelible/indelible_config.json"
+}
