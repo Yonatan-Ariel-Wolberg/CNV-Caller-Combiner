@@ -1,0 +1,6 @@
+{
+  "workflow": "normalise",
+  "outdir": "./results/normalise",
+  "vcf_dir": "./vcfs",
+  "caller": "canoes"
+}

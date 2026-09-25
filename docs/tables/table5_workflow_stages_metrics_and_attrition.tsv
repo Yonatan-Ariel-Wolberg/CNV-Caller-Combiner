@@ -1,0 +1,9 @@
+Stage_Index	Pipeline_Stage	Candidate_Calls	Step_Attrition	Cumulative_Retention	Control_Arm_Calls	Biological_Purpose
+1	1. Raw Multi-Caller Discovery	46791	0.0%	100.00%	94359	Multi-caller parallel baseline
+2	2. Quality Score Normalization Gate	67	−99.9%	0.14%	964	Universal scale [0–1000] & quality filters
+3	3. Intra-Sample Multi-Caller Union	60	−10.4%	0.13%	398	Union of all caller calls (retains >=1 caller)
+4	4. Breakpoint Refinement (Precise & Imprecise)	60	0.0%	0.13%	398	Base-pair junctions via SvABA (100% calls retained)
+5	5. Inter-Sample Cohort Union	58	−3.3%	0.12%	106	Union across cohort samples (retains >=1 sample)
+6	6. Internal Cohort AF Filtering (<1%)	9	−84.5%	0.02%	33	Purges benign common cohort polymorphisms
+7	7. CatBoost Machine Learning (P ≥ 0.50)	1	−88.9%	0.00%	7	In silico gradient boosted probability triage
+8	8. ACMG Class 4/5 Prioritisation	0	−100.0%	0.00%	0	High-confidence clinical pathogenic candidates

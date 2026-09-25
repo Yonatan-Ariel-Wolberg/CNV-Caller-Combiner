@@ -1,0 +1,64 @@
+name: Build and Publish Docker Images
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # ---------------------------------------------------
+      # 1. Build and push the ICAv2 CLI Image
+      # ---------------------------------------------------
+      - name: Build and push icav2 image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: containers/Dockerfile.icav2
+          push: true
+          # FORMAT: username/repository_name:specific_tag
+          tags: |
+            ywolberg/cnv-caller-combiner:icav2-cli-2.43.0
+            ywolberg/cnv-caller-combiner:icav2-cli
+
+      # ---------------------------------------------------
+      # 2. Build and push the CatBoost / ML Train Image
+      # ---------------------------------------------------
+      - name: Build and push train image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: containers/Dockerfile.train
+          push: true
+          # FORMAT: username/repository_name:specific_tag
+          tags: |
+            ywolberg/cnv-caller-combiner:catboost-train-1.0.0
+            ywolberg/cnv-caller-combiner:catboost-train
+            ywolberg/cnv-caller-combiner:train-xgboost-1.0.0
+            ywolberg/cnv-caller-combiner:train-xgboost
+
+      # ---------------------------------------------------
+      # 3. Build and push the SeeNV Visualizer Image
+      # ---------------------------------------------------
+      - name: Build and push seenv image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: containers/Dockerfile.seenv
+          push: true
+          # FORMAT: username/repository_name:specific_tag
+          tags: |
+            ywolberg/cnv-caller-combiner:seenv-visualizer-1.0.0
+            ywolberg/cnv-caller-combiner:seenv-visualizer

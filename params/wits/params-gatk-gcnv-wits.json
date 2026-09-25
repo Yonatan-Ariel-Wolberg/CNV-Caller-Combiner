@@ -1,0 +1,14 @@
+{
+  "workflow": "gcnv",
+  "bind_paths": "/spaces,/dataG,/dataB/aux,/home/ywolberg,/dataG/ddd,/dataG/ddd-2023",
+  "fai": "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai",
+  "exome_targets": "/dataG/ddd/data/resources/canoes/probes_sanger.interval_list",
+  "fasta": "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa",
+  "dict": "ref.dict",
+  "samples_path": "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/**/*.{bam,bam.bai}",
+  "outdir": "./results/gcnv",
+  "bin_length": 0,
+  "padding": 250,
+  "is_wgs": false,
+  "scatter_count": 5000
+}

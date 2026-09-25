@@ -1,0 +1,11 @@
+{
+  "workflow": "cnvkit",
+  "bind_paths": "/spaces,/dataG,/dataB/aux,/home/ywolberg,/dataG/ddd,/dataG/ddd-2023",
+  "targets": "/dataG/ddd/data/resources/canoes/probes_sanger.bed",
+  "fasta": "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa",
+  "outdir": "./results/cnvkit",
+  "bams": "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/**/*.{bam,bam.bai}",
+  "refflat": "refFlat.txt",
+  "test_size": -1,
+  "test_list": ""
+}

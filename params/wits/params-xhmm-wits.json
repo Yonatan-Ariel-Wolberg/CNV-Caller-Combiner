@@ -1,0 +1,10 @@
+{
+  "workflow": "xhmm",
+  "bind_paths": "/spaces,/dataG,/dataB/aux,/home/ywolberg,/dataG/ddd,/dataG/ddd-2023",
+  "probes": "/dataG/ddd/data/resources/canoes/probes_sanger.bed",
+  "xhmm_conf": "/dataG/ddd/data/resources/xhmm/params.txt",
+  "ref": "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa",
+  "samplesheet_bams": "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/samplesheet.tsv",
+  "outdir": "./results/xhmm",
+  "xhmm_batch_size": 50
+}

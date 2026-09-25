@@ -1,0 +1,13 @@
+{
+  "workflow": "gcnv",
+  "outdir": "./results/gcnv",
+  "samples_path": "bams/*.bam",
+  "fasta": "ref.fa",
+  "fai": "ref.fa.fai",
+  "dict": "ref.dict",
+  "exome_targets": "probes.interval_list",
+  "bin_length": 0,
+  "padding": 250,
+  "is_wgs": false,
+  "scatter_count": 5000
+}

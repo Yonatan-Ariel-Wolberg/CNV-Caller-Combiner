@@ -1,0 +1,47 @@
+#!/bin/bash
+
+# =============================================================================
+# Detailed documentation: xcnv_to_cnv
+# Purpose: This pipeline helper script converts XHMM output files (.xcnv format)
+#   to PLINK-compatible .cnv format files.
+# Scope: General utility execution.
+# Inputs:
+#   - An XHMM .xcnv file containing columns such as SAMPLE, CNV, INTERVAL, Q_SOME, and NUM_TARG.
+# Outputs:
+#   - Standard output containing a tab-separated PLINK .cnv table with columns:
+#     FID, IID, CHR, BP1, BP2, TYPE, SCORE, SITE
+# Operational notes:
+#   - Extracts chromosome, start (BP1), and end (BP2) coordinates from the INTERVAL column.
+#   - Removes the "chr" prefix from chromosome names for PLINK compatibility.
+#   - Maps CNV genotypes: DEL is mapped to TYPE 1, DUP is mapped to TYPE 3, and default is TYPE 2.
+#   - Maps XHMM Q_SOME to SCORE and NUM_TARG to SITE.
+#   - Family ID (FID) is populated with the SAMPLE name, and Individual ID (IID) is set to 1.
+# =============================================================================
+
+# Ensure exactly one command-line argument is passed (the input .xcnv file)
+if [[ $# -ne 1 ]]
+then
+    echo "Converts XHMM .xcnv format to PLINK .cnv format"
+    echo "Usage: xcnv_to_cnv [XCNV_FILE]"
+    exit 1
+fi
+
+INPUT=$1
+
+# Process the input file using awk:
+# 1. Print the header line: FID, IID, CHR, BP1, BP2, TYPE, SCORE, SITE
+# 2. Build a header mapping (HD array) from the first line (NR==1) to dynamically lookup column indexes.
+# 3. For subsequent lines (else block):
+#    - Split the INTERVAL column (e.g. chr1:100-200) by ':' to get chromosome and coordinates.
+#    - Strip any leading "chr" from the chromosome name.
+#    - Split the coordinates by '-' to get BP1 and BP2.
+#    - Map CNV call type (DEL -> 1, DUP -> 3, otherwise 2).
+#    - Print the mapped columns matching PLINK .cnv specification.
+cat $INPUT | \
+awk -F"\t" \
+    'BEGIN{OFS="\t"; print "FID","IID","CHR","BP1","BP2","TYPE","SCORE","SITE"} \
+    {if (NR==1) {for (i=1; i<=NF; i++) HD[$i]=i} \
+    else {split($(HD["INTERVAL"]),a,":"); chr=a[1]; gsub("^chr", "", chr); split(a[2],b,"-"); bp1=b[1]; bp2=b[2]; if (length(b) > 1) {bp2=b[2]} \
+    type=2; if ($(HD["CNV"]) == "DEL") {type=1} else if ($(HD["CNV"]) == "DUP") {type=3}; \
+    print $(HD["SAMPLE"]),1,chr,bp1,bp2,type,$(HD["Q_SOME"]),$(HD["NUM_TARG"])}}'
+

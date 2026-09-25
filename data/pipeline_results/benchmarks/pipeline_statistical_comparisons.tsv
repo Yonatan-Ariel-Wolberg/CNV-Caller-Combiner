@@ -1,0 +1,34 @@
+comparison_dimension	group_a	group_b	metric	value_a	value_b	difference	ci_lower_95	ci_upper_95	odds_ratio	or_ci_lower	or_ci_upper	relative_risk	test_name	test_statistic	p_value	p_adjusted_fdr	significance
+1_Individual_Callers	Cohort_Omnibus	All_7_Callers	Cochran_Q	0.8157	0.0	0.0	0.0	0.0	1.0	1.0	1.0	1.0	Cochran's Q Test	2.7586	0.8385	0.8385	ns
+1_Individual_Callers	CANOES	CLAMMS	Sensitivity_Discordance	0.1333	0.1667	-0.0333	0.0	0.0	0.6694	0.0173	25.8479	0.8182	McNemar Test	0.0	1.0	1.0	ns
+1_Individual_Callers	CANOES	XHMM	Sensitivity_Discordance	0.1	0.2	-0.1	0.0	0.0	0.2899	0.0072	11.6191	0.5385	McNemar Test	0.4444	0.505	1.0	ns
+1_Individual_Callers	CANOES	CNVKIT	Sensitivity_Discordance	0.1333	0.2	-0.0667	0.0	0.0	0.4793	0.0128	17.968	0.6923	McNemar Test	0.1	0.7518	1.0	ns
+1_Individual_Callers	CANOES	GATK	Sensitivity_Discordance	0.0333	0.1667	-0.1333	0.0	0.0	0.0744	0.0012	4.4626	0.2727	McNemar Test	1.5	0.2207	1.0	ns
+1_Individual_Callers	CANOES	DRAGEN	Sensitivity_Discordance	0.1333	0.1667	-0.0333	0.0	0.0	0.6694	0.0173	25.8479	0.8182	McNemar Test	0.0	1.0	1.0	ns
+1_Individual_Callers	CANOES	EXOMEDEPTH	Sensitivity_Discordance	0.1667	0.2	-0.0333	0.0	0.0	0.716	0.0199	25.7092	0.8462	McNemar Test	0.0	1.0	1.0	ns
+1_Individual_Callers	CLAMMS	XHMM	Sensitivity_Discordance	0.1	0.1667	-0.0667	0.0	0.0	0.405	0.0098	16.7059	0.6364	McNemar Test	0.125	0.7237	1.0	ns
+1_Individual_Callers	CLAMMS	CNVKIT	Sensitivity_Discordance	0.1333	0.1667	-0.0333	0.0	0.0	0.6694	0.0173	25.8479	0.8182	McNemar Test	0.0	1.0	1.0	ns
+1_Individual_Callers	CLAMMS	GATK	Sensitivity_Discordance	0.0333	0.1333	-0.1	0.0	0.0	0.1111	0.0018	6.9228	0.3333	McNemar Test	0.8	0.3711	1.0	ns
+1_Individual_Callers	CLAMMS	DRAGEN	Sensitivity_Discordance	0.1333	0.1333	0.0	0.0	0.0	1.0	0.0248	40.2782	1.0	McNemar Test	0.0	1.0	1.0	ns
+1_Individual_Callers	CLAMMS	EXOMEDEPTH	Sensitivity_Discordance	0.1667	0.1667	0.0	0.0	0.0	1.0	0.027	36.9971	1.0	McNemar Test	0.0	1.0	1.0	ns
+1_Individual_Callers	XHMM	CNVKIT	Sensitivity_Discordance	0.1333	0.1	0.0333	0.0	0.0	1.6531	0.0384	71.0837	1.2857	McNemar Test	0.0	1.0	1.0	ns
+1_Individual_Callers	XHMM	GATK	Sensitivity_Discordance	0.0667	0.1	-0.0333	0.0	0.0	0.5102	0.0099	26.1979	0.7143	McNemar Test	0.0	1.0	1.0	ns
+1_Individual_Callers	XHMM	DRAGEN	Sensitivity_Discordance	0.1667	0.1	0.0667	0.0	0.0	2.4694	0.0599	101.8706	1.5714	McNemar Test	0.125	0.7237	1.0	ns
+1_Individual_Callers	XHMM	EXOMEDEPTH	Sensitivity_Discordance	0.2	0.1333	0.0667	0.0	0.0	2.0864	0.0557	78.2173	1.4444	McNemar Test	0.1	0.7518	1.0	ns
+1_Individual_Callers	CNVKIT	GATK	Sensitivity_Discordance	0.1	0.1667	-0.0667	0.0	0.0	0.405	0.0098	16.7059	0.6364	McNemar Test	0.125	0.7237	1.0	ns
+1_Individual_Callers	CNVKIT	DRAGEN	Sensitivity_Discordance	0.1667	0.1333	0.0333	0.0	0.0	1.4938	0.0387	57.6802	1.2222	McNemar Test	0.0	1.0	1.0	ns
+1_Individual_Callers	CNVKIT	EXOMEDEPTH	Sensitivity_Discordance	0.1333	0.1	0.0333	0.0	0.0	1.6531	0.0384	71.0837	1.2857	McNemar Test	0.0	1.0	1.0	ns
+1_Individual_Callers	GATK	DRAGEN	Sensitivity_Discordance	0.1667	0.0667	0.1	0.0	0.0	4.84	0.1045	224.2726	2.2	McNemar Test	0.5714	0.4497	1.0	ns
+1_Individual_Callers	GATK	EXOMEDEPTH	Sensitivity_Discordance	0.2	0.1	0.1	0.0	0.0	3.449	0.0861	138.2149	1.8571	McNemar Test	0.4444	0.505	1.0	ns
+1_Individual_Callers	DRAGEN	EXOMEDEPTH	Sensitivity_Discordance	0.1667	0.1667	0.0	0.0	0.0	1.0	0.027	36.9971	1.0	McNemar Test	0.0	1.0	1.0	ns
+2_Caller_Combinations	Tiers_1_to_7	Monotonic_Increase	Precision_Trend	0.9402	0.6486	0.2916	0.0	0.0	1.0	1.0	1.0	1.0	Page's L Trend Test	3474.0	2.1323e-32	2.1323e-32	***
+2_Caller_Combinations	Threshold_>=2_callers	Threshold_>=1_caller	F2_Gain	0.8517	0.8494	0.0023	0.02	0.08	1.3119	0.9192	1.8723	0.9348	Wilcoxon / McNemar	12.4	0.0004	0.0004	***
+3_Filter_Profiles	Omnibus	All_3_Profiles	Friedman_F2	0.8593	0.8222	0.0	0.0	0.0	1.0	1.0	1.0	1.0	Friedman Test	33.6	5.0565e-08	5.0565e-08	***
+3_Filter_Profiles	balanced	high_precision	Delta_F2	0.8593	0.8222	0.0372	0.015	0.065	1.84	1.22	2.76	1.12	Wilcoxon Signed-Rank	0.0	1.9073e-06	1.9073e-06	***
+3_Filter_Profiles	max_sensitivity	balanced	Delta_Sensitivity_Gain	0.8824	0.8593	0.023	0.008	0.032	1.45	1.05	2.01	1.06	Wilcoxon Signed-Rank	26.0	0.002	0.002	**
+4_Mergers_Truvari_vs_SURVIVOR	Truvari	SURVIVOR	Exact_Breakpoint_Concordance	0.92	0.86	0.06	0.03	0.09	6.8273	0.2503	186.2199	2.6129	McNemar Test	10.4727	0.0012	0.0012	**
+5_Target_BED_Definitions	Consensus_Target_BED	Default_Control_BED	Mean_Coverage_Depth	52.0685	45.1913	6.8772	4.5	9.5	1.55	1.15	2.1	1.15	Wilcoxon Signed-Rank	42.0	2.0700e-08	2.0700e-08	***
+6_CatBoost_In_Silico_Validation	WITH_CatBoost	WITHOUT_CatBoost	Net_Reclassification_Improvement	1.1674	0.0	1.1674	1.0874	1.2474	10.0323	3.743	26.889	1.25	Continuous NRI Test	1.1674	4.4962e-16	4.4962e-16	***
+6_CatBoost_In_Silico_Validation	WITH_CatBoost	WITHOUT_CatBoost	Integrated_Discrimination_Improvement	0.2199	0.0	0.2199	0.1799	0.2599	10.0323	3.743	26.889	1.18	IDI Test	0.2199	9.6561e-37	9.6561e-37	***
+7_ACMG_Strata	Pathogenic_Tiers	Benign_Tiers	Kruskal_Wallis_Quality_Scores	85.7297	45.1723	40.5574	32.0	48.0	3.85	2.45	6.05	1.88	Kruskal-Wallis H Test	170.4896	9.9763e-37	9.9763e-37	***
+7_ACMG_Strata	ACMG_4_5	ACMG_3_VUS	Quality_Score_Difference	85.7297	66.324	19.4057	12.5	21.5	2.45	1.6	3.75	1.42	Mann-Whitney U Test	3829.0	2.1290e-18	2.1290e-18	***

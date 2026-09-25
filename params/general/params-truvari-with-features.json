@@ -1,0 +1,7 @@
+{
+  "workflow": "truvari_with_features",
+  "outdir": "./results/truvari_features",
+  "merger_mode": "truvari",
+  "canoes_dir": "./canoes_vcf",
+  "clamms_dir": "./clamms_vcf"
+}

@@ -1,0 +1,11 @@
+Confusion Matrix:
+  TP: 0
+  FP: 0
+  FN: 2283
+  TN: 78310
+Sensitivity: 0.0
+Precision: 0
+Specificity: 1.0
+F_beta (beta=2): 0
+Matthews Correlation Coefficient: 0
+True Negatives: 78310

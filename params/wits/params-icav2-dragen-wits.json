@@ -1,0 +1,6 @@
+{
+  "workflow": "dragen",
+  "bind_paths": "/spaces,/dataG,/dataB/aux,/home/ywolberg,/dataG/ddd,/dataG/ddd-2023",
+  "cramFilePairsUploadPath": "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/bams/**/*.{bam,bam.bai,cram,cram.crai},/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/crams/**/*.{bam,bam.bai,cram,cram.crai},/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/Proband/**/*.{bam,bam.bai,cram,cram.crai}",
+  "outdir": "./results/dragen"
+}

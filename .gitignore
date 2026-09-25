@@ -1,0 +1,115 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Nextflow work directories and caches
+work/
+.nextflow/
+.nextflow.log*
+results/
+.nested_*_work
+
+# Singularity, Apptainer, Podman & Docker Containers
+*.sif
+*.sif.gz
+**/*.sif
+**/*.sif.gz
+*.tar
+*.tar.gz
+*.tar.xz
+*.oci
+*.docker
+*.img
+bin/*.sif
+bin/*.tar*
+
+# Completed container images and archives
+*icav2-cli*
+*catboost-train*
+*train-xgboost*
+*seenv-visualizer*
+icav2_cli*.sif
+catboost-train*.sif
+train-xgboost*.sif
+seenv-visualizer*.sif
+seenv*.sif
+containers_storage/
+.containers/
+
+
+#Ignore insiders AI rules
+.github/instructions/codacy.instructions.md
+
+# Ignore SLURM output files
+slurm-*.out
+slurm-*.err
+logs/
+
+# Ignore test files
+test_output/
+test_data_*/
+
+# Ignore VCF files
+*.vcf
+*.vcf.gz
+**/*.vcf.gz
+**/*.vcf
+**/**/*.vcf.gz
+**/**/*.vcf
+**/**/**/*.vcf.gz
+**/**/**/*.vcf
+
+# Ignore Nested Work
+.nested_*
+
+# Agent configurations and skills
+.agents/
+
+scratch/
+
+# Large Datasets / Tarballs
+Annotations_Human_3.5.tar.gz
+annotsv_db/
+
+# Nextflow / Execution reports & QC outputs
+exec_reports/
+qc_launch/
+qc_results/
+qc_results_ddd_uk/
+
+# Custom execution results
+results_clean_targeted/
+results_karyotypic/
+fips_zero
+
+CNV_Caller_Filtering_Guide.pdf
+cross_faculty_poster_materials.zip
+17-cross-faculty-poster
+
+run*.out
+run*.err
+
+CNV*.md
+CNV_Caller_Filtering_Guide*
+catboost_info/
+*.bak
+test_*.png
+
+# Protect confidential participant data, samplesheets, truth sets, and cluster mappings
+*samplesheet*.tsv
+*samplesheet*.csv
+*.samplesheet*
+*truth_labels*
+*truthset*
+*truth_bed*
+*.map
+*sex*info*
+*.info
+*.fam
+*.ped
+
+# Local test configurations and submission scripts with cluster paths
+params/ddd-uk/
+sbatch/run-workflow-qc-gated-dual-bed.sbatch
+sbatch/run-workflow-local-*.sbatch

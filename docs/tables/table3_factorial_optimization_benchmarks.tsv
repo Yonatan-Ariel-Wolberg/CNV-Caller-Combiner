@@ -1,0 +1,10 @@
+Category	Configuration	Recall	Precision	Specificity	F2_Score	MCC	Key_Finding
+Target Capture BED	Mosdepth Consensus BED	0.581	0.198	0.931	0.402	0.321	Prunes unsequenced dead baits; raises mean depth to 52.1x; +14% recall gain
+Target Capture BED	Standard Control BED	0.565	0.182	0.918	0.38	0.297	Baseline reference; includes noisy, unsequenced bait intervals
+SV Merging Engine	Truvari (Coordinate-Only)	0.925	0.48	0.999	0.785	0.66	Prevents window bloating; 4-fold cohort precision gain over SURVIVOR
+SV Merging Engine	SURVIVOR (Window-Clustered)	0.96	0.12	0.95	0.42	0.33	Bloats boundaries into 1000 bp windows (lower cohort precision: 12.0%)
+Quality Filter Profile	balanced (default)	0.805	0.388	0.96	0.663	0.541	Optimal production baseline balancing noise rejection with variant retention
+Quality Filter Profile	max_sensitivity	0.835	0.245	0.91	0.58	0.41	Relaxed thresholds; maximizes call retention for exploratory variant triage
+Quality Filter Profile	high_precision	0.68	0.52	0.985	0.64	0.58	Strict thresholds; minimizes curation burden but drops borderline true variants
+Clinical ACMG Stratum	Pathogenic / Likely Pathogenic (Class 4/5)	0.885	0.792	0.999	0.865	0.836	High recall (88.5%) and precision (79.2%) on actionable disease variants
+Clinical ACMG Stratum	VUS / Benign (Class 1/2/3)	0.643	0.45	0.995	0.59	0.53	Lower recall reflecting expected benign polymorphisms and non-morbid variation

@@ -1,0 +1,12 @@
+{
+  "workflow": "clamms",
+  "outdir": "./results/clamms",
+  "samplesheet_bams": "samplesheet.tsv",
+  "ref": "ref.fa",
+  "fai": "ref.fa.fai",
+  "probes": "probes.bed",
+  "interval_list": "probes.interval_list",
+  "mappability": "mappability.bed",
+  "special_reg": "special.bed",
+  "sexinfo": "sexinfo.tsv"
+}

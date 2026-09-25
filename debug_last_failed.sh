@@ -1,0 +1,1 @@
+scripts/debug_last_failed.sh

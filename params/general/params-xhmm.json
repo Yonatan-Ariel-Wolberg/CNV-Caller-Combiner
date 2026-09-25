@@ -1,0 +1,9 @@
+{
+  "workflow": "xhmm",
+  "outdir": "./results/xhmm",
+  "samplesheet_bams": "samplesheet.tsv",
+  "ref": "ref.fa",
+  "probes": "probes.bed",
+  "xhmm_conf": "params/xhmm.conf",
+  "xhmm_batch_size": 50
+}

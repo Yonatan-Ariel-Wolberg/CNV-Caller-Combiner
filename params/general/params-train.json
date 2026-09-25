@@ -1,0 +1,8 @@
+{
+  "workflow": "train",
+  "features_dir": "results/feature_extraction",
+  "truth_labels": "data/truth_labels.tsv",
+  "probes_bed": "data/probes.bed",
+  "ml_classifier": "catboost",
+  "outdir": "results"
+}

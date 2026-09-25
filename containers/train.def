@@ -1,0 +1,41 @@
+# ==============================================================================
+# Apptainer/Singularity Definition File: train.def
+# Description: Installs Python ML dependencies (xgboost, scikit-learn, etc.)
+#              for the exome CNV model training workflow.
+#              This recipe bootstraps from quay.io/condaforge/mambaforge.
+# ==============================================================================
+
+Bootstrap: docker
+From: quay.io/condaforge/mambaforge:24.9.2-0
+
+%labels
+    software="train-ml-deps"
+    software.version="mambaforge-24.9.2-0"
+    about.summary="Prebuilt image for nf-multicaller-exomecnv train workflow (CatBoost & XGBoost)"
+    about.license="BSD-3-Clause"
+    about.tags="catboost, xgboost, scikit-learn, imbalanced-learn, pandas, numpy, pysam"
+
+%environment
+    export LANG=C.UTF-8
+    export LC_ALL=C.UTF-8
+    export PYTHONUNBUFFERED=1
+    export PYTHONDONTWRITEBYTECODE=1
+    export WORKDIR=/workspace
+
+%post
+    # Install key ML & data science dependencies via mamba
+    mamba install -y -n base -c conda-forge \
+      catboost \
+      pysam \
+      xgboost=2.1.4 \
+      scikit-learn=1.6.1 \
+      imbalanced-learn=0.13.0 \
+      pandas=2.2.3 \
+      numpy=2.2.3 \
+    && mamba clean -afy \
+    && rm -rf /root/.cache /tmp/* /var/tmp/* /opt/conda/pkgs/*
+
+    # Create workspace mount point with open permissions for HPC execution
+    mkdir -p /workspace
+    chmod 0777 /workspace
+

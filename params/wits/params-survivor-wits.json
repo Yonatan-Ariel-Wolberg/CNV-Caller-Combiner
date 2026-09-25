@@ -1,0 +1,5 @@
+{
+  "workflow": "survivor",
+  "bind_paths": "/spaces,/dataG,/dataB/aux,/home/ywolberg,/dataG/ddd,/dataG/ddd-2023",
+  "outdir": "./results/survivor"
+}

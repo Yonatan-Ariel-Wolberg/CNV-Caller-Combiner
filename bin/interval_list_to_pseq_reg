@@ -1,0 +1,44 @@
+#!/bin/bash
+
+# =============================================================================
+# Detailed documentation: interval_list_to_pseq_reg
+# Purpose: This pipeline helper script converts a GATK-style interval_list format
+#   file (e.g., chrom:start-end) into a Plink/Seq region format, suitable for
+#   downstream genomic region association analyses in the CNV pipeline.
+# Scope: General utility execution.
+# Inputs: 
+#   - A file containing GATK intervals (e.g., 1:1000-2000 or chr1:1000-2000).
+# Outputs: 
+#   - Standard output containing a tab-separated table with columns:
+#     #CHR, BP1, BP2, ID
+# Operational notes:
+#   - Standardizes chromosome names by prepending "chr" if absent.
+#   - Splits colon- and hyphen-delimited intervals into distinct start/stop coordinates.
+#   - Automatically handles single-point intervals (where no hyphen/end exists).
+#   - Automatically numbers regions with a sequential ID (using awk's NR).
+# =============================================================================
+
+# Ensure exactly one command-line argument is passed (the input interval list file)
+if [[ $# -ne 1 ]]
+then
+    echo "Converts GATK interval_list to Plink/Seq region format"
+    echo "Usage: interval_list_to_pseq_reg [INTERVAL_LIST_FILE]"
+    exit 1
+fi
+    
+INPUT=$1
+
+# Process the input file using awk:
+# 1. Print the header line: #CHR, BP1, BP2, ID
+# 2. Split the first column by ':' to separate the chromosome name from the coordinates.
+# 3. Standardize chromosome prefix to always start with "chr".
+# 4. Split the coordinate range by '-' to separate start (bp1) and end (bp2) positions.
+# 5. If no end position exists (length of array is 1), default the end position to the start position.
+# 6. Print the chromosome, start, end, and the current row number (NR) as the ID.
+cat $INPUT | \
+awk 'BEGIN{OFS="\t"; print "#CHR\tBP1\tBP2\tID"} \
+{split($1,a,":"); chr=a[1]; \
+if (match(chr,"chr")==0) {chr="chr"chr} \
+split(a[2],b,"-"); bp1=b[1]; bp2=bp1; if (length(b) > 1) {bp2=b[2]} \
+print chr,bp1,bp2,NR}'
+

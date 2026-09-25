@@ -1,0 +1,12 @@
+{
+  "workflow": "exomedepth",
+  "outdir": "./results",
+  "samplesheet_bams": "data/samplesheet.tsv",
+  "ref": "data/reference.fasta",
+  "fai": "data/reference.fasta.fai",
+  "probes": "data/probes.bed",
+  "exomedepth_batch_size": 50,
+  "exomedepth_min_bf": 10.0,
+  "exomedepth_min_correlation": 0.97,
+  "exomedepth_transition_prob": 0.0001
+}

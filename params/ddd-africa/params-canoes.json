@@ -1,0 +1,9 @@
+{
+  "workflow": "canoes",
+  "outdir": "./results/canoes",
+  "samplesheet_bams": "samplesheet.tsv",
+  "ref": "ref.fa",
+  "fai": "ref.fa.fai",
+  "probes": "probes.bed",
+  "canoes_batch_size": 100
+}

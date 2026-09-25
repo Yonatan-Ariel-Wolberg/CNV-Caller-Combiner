@@ -1,0 +1,6 @@
+{
+  "workflow": "survivor",
+  "outdir": "./results/survivor",
+  "canoes_dir": "./canoes_vcf",
+  "clamms_dir": "./clamms_vcf"
+}

@@ -1,0 +1,62 @@
+# ==============================================================================
+# Dockerfile: Dockerfile.train
+# Description: Production-ready, security-hardened Docker image containing Python
+#              ML dependencies (catboost, xgboost, scikit-learn, etc.) for CNV classification.
+# Base Image:  Mambaforge (quay.io/condaforge/mambaforge:24.9.2-0)
+# Security:    Runs as non-root user (appuser, UID/GID 10001), cleaned package caches,
+#              permissive workspace mount point for HPC / Nextflow staging.
+# ==============================================================================
+
+FROM quay.io/condaforge/mambaforge:24.9.2-0
+
+# Use bash with pipefail for robust build execution
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+
+# Runtime environment settings
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    WORKDIR=/workspace \
+    PATH=/opt/conda/envs/ml/bin:/opt/conda/bin:$PATH
+
+# Metadata labels mapping to standard opencontainers and biocontainers schema
+LABEL org.opencontainers.image.title="catboost-train" \
+      org.opencontainers.image.description="ML model training and validation environment (CatBoost & XGBoost) for germline CNV calling" \
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.licenses="BSD-3-Clause" \
+      org.opencontainers.image.source="https://github.com/Yonatan-Ariel-Wolberg/CNV-Caller-Combiner" \
+      software="catboost-train-deps" \
+      software.version="1.0.0" \
+      about.summary="Prebuilt image for nf-multicaller-exomecnv train workflow (CatBoost & XGBoost)" \
+      about.license="BSD-3-Clause" \
+      about.tags="catboost, xgboost, scikit-learn, imbalanced-learn, pandas, numpy, pysam"
+
+# Install machine learning packages using mamba for rapid dependency resolution,
+# purge conda caches, create permissive workspace directory, and add non-root user.
+RUN mamba create -y -n ml -c conda-forge -c bioconda \
+      catboost \
+      pysam \
+      xgboost=2.1.4 \
+      scikit-learn=1.6.1 \
+      imbalanced-learn=0.13.0 \
+      pandas=2.2.3 \
+      numpy=2.2.3 \
+    && mamba clean -afy \
+    && rm -rf /root/.cache /tmp/* /var/tmp/* /opt/conda/pkgs/* \
+    && groupadd -g 10001 appuser \
+    && useradd -u 10001 -g 10001 -m -s /bin/bash appuser \
+    && mkdir -p /workspace \
+    && chown -R 10001:10001 /workspace \
+    && chmod 0777 /workspace \
+    && /opt/conda/envs/ml/bin/python3 -c "import catboost, xgboost, sklearn, imblearn, pandas, numpy, pysam; print('ML dependencies verified')"
+
+# Set working directory
+WORKDIR /workspace
+
+# Switch to non-root user (CIS Docker Benchmark 4.1)
+USER 10001:10001
+
+# Default command runs a quick verification of the ML stack
+CMD ["python3", "-c", "import catboost, xgboost, sklearn, imblearn, pandas, numpy, pysam; print('CNV CatBoost/ML environment ready')"]
+

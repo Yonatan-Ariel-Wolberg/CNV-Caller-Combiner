@@ -1,0 +1,6 @@
+{
+  "workflow": "truvari",
+  "outdir": "./results/truvari",
+  "canoes_dir": "./canoes_vcf",
+  "clamms_dir": "./clamms_vcf"
+}

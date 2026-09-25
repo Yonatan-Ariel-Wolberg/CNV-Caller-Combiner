@@ -1,0 +1,22 @@
+{
+    "filter_profile": "balanced",
+    "canoes_q_some_min": 65,
+    "canoes_min_size": 500,
+    "clamms_q_some_min": 50,
+    "clamms_q_exact_del_min": 0.0,
+    "clamms_q_exact_dup_min": -0.5,
+    "xhmm_sq_min": 50,
+    "xhmm_ndq_min": 30,
+    "xhmm_eq_min": 30,
+    "xhmm_min_size": 500,
+    "cnvkit_min_size": 5000,
+    "cnvkit_min_probes": 3,
+    "gcnv_qs_del_min": 100,
+    "gcnv_qs_dup_min": 50,
+    "gcnv_single_interval_qs_min": 100,
+    "dragen_qual_min": 30,
+    "dragen_min_bc": 2,
+    "dragen_min_size": 5000,
+    "exomedepth_bf_min": 10.0,
+    "exomedepth_min_size": 500
+}

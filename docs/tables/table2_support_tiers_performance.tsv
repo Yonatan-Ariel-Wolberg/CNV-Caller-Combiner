@@ -1,0 +1,8 @@
+Support_Tier	Precision	Recall	Cumulative_Retention	F2_Score	Operational_Interpretation
+k >= 1 (Any Caller)	0.6486	0.9812000000000001	1.0	0.8899	Baseline
+k >= 2 (Optimal)	0.852	0.9670000000000001	0.784	0.9416	Peak F_2 Harmonic Gain (p = 0.0004)
+k >= 3	0.898	0.9129999999999999	0.612	0.91	Clinical Triaging Tier
+k >= 4	0.924	0.845	0.478	0.8597	Confirmatory Diagnostic Tier
+k >= 5	0.9309999999999999	0.762	0.361	0.7907	High Specificity Tier
+k >= 6	0.938	0.684	0.275	0.7232	Strict Consensus Tier
+k = 7 (All Callers)	0.9401999999999999	0.5710000000000001	0.192	0.6197	Overly Restrictive (42.9% sensitivity loss)

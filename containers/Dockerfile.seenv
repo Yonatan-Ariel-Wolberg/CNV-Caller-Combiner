@@ -1,0 +1,84 @@
+# ==============================================================================
+# Dockerfile: Dockerfile.seenv
+# Description: Production-ready, security-hardened Docker image for SeeNV
+#              (Bradshaw et al., J Mol Diagn 2023) exome CNV visual curation.
+# Base Image:  Mambaforge (quay.io/condaforge/mambaforge:24.9.2-0)
+# Security:    Runs as non-root user (appuser, UID/GID 10001) per CIS Docker Benchmark 4.1,
+#              pinned dependency versions, verified SHA-256 checksums, permissive workspace.
+# ==============================================================================
+
+FROM quay.io/condaforge/mambaforge:24.9.2-0
+
+# Use bash with pipefail for robust build execution
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+
+# Runtime environment settings
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    WORKDIR=/workspace \
+    PATH=/opt/conda/envs/seenv/bin:/opt/conda/bin:$PATH
+
+# Metadata labels mapping to standard opencontainers and biocontainers schema
+LABEL org.opencontainers.image.title="seenv-visualizer" \
+      org.opencontainers.image.description="Production SeeNV exome CNV curation and infographic generation environment" \
+      org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.licenses="GPL-3.0" \
+      org.opencontainers.image.source="https://github.com/Yonatan-Ariel-Wolberg/CNV-Caller-Combiner" \
+      software="SeeNV" \
+      software.version="1.0.0" \
+      about.summary="Prebuilt image for SeeNV exome CNV manual curation with cohort reference panels" \
+      about.home="https://github.com/MSBradshaw/SeeNV" \
+      about.license="GPL-3.0" \
+      about.tags="genomics, cnv, visualization, exome, seenv"
+
+# Install pinned dependencies using mamba, install SeeNV at pinned commit SHA,
+# verify binary checksums, purge caches, and create non-root user.
+RUN mamba create -y -n seenv -c conda-forge -c bioconda \
+      python=3.10.14 \
+      samtools=1.21 \
+      bedtools=2.31.1 \
+      mosdepth=0.3.14 \
+      pysam=0.22.1 \
+      snakemake-minimal=7.32.4 \
+      matplotlib=3.8.4 \
+      pandas=2.2.3 \
+      numpy=1.26.4 \
+      scipy=1.13.1 \
+      curl \
+      git \
+    && curl -fsSL "https://github.com/brentp/gargs/releases/download/v0.3.9/gargs_linux" -o /tmp/gargs \
+    && echo "05638fb74bca9a1a0a888b70b084b039771b61362b997bab73487ee0635c1171  /tmp/gargs" | sha256sum -c - \
+    && mv /tmp/gargs /opt/conda/envs/seenv/bin/gargs \
+    && chmod 0755 /opt/conda/envs/seenv/bin/gargs \
+    && git clone https://github.com/MSBradshaw/SeeNV.git /opt/seenv \
+    && cd /opt/seenv \
+    && git checkout 95566019d1ac880efe1b658623d74b29314376bc \
+    && cp bin/*.py /opt/conda/envs/seenv/bin/ \
+    && cp bin/seenv /opt/conda/envs/seenv/bin/seenv \
+    && cp bin/*.smk /opt/conda/envs/seenv/bin/ \
+    && cp *.json /opt/conda/envs/seenv/bin/ \
+    && chmod 0755 /opt/conda/envs/seenv/bin/seenv /opt/conda/envs/seenv/bin/*.py \
+    && cd / && rm -rf /opt/seenv \
+    && mamba clean -afy \
+    && rm -rf /root/.cache /tmp/* /var/tmp/* /opt/conda/pkgs/* \
+    && groupadd -g 10001 appuser \
+    && useradd -u 10001 -g 10001 -m -s /bin/bash appuser \
+    && mkdir -p /workspace \
+    && chown -R 10001:10001 /workspace \
+    && chmod 0777 /workspace \
+    && /opt/conda/envs/seenv/bin/python3 -c "import matplotlib, pandas, numpy, scipy, pysam; print('SeeNV Python stack verified')" \
+    && /opt/conda/envs/seenv/bin/samtools --version > /dev/null \
+    && /opt/conda/envs/seenv/bin/bedtools --version > /dev/null \
+    && /opt/conda/envs/seenv/bin/mosdepth --version > /dev/null \
+    && /opt/conda/envs/seenv/bin/gargs --help > /dev/null 2>&1 || true
+
+# Set working directory
+WORKDIR /workspace
+
+# Switch to non-root user (CIS Docker Benchmark 4.1)
+USER 10001:10001
+
+# Default command validates SeeNV execution environment
+CMD ["seenv", "--help"]

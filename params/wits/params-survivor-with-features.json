@@ -1,0 +1,7 @@
+{
+  "workflow": "survivor_with_features",
+  "outdir": "./results/survivor_features",
+  "merger_mode": "survivor",
+  "canoes_dir": "./canoes_vcf",
+  "clamms_dir": "./clamms_vcf"
+}

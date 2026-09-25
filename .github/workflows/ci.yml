@@ -1,0 +1,64 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Nextflow
+        uses: nf-core/setup-nextflow@v2
+        with:
+          version: 'latest-stable'
+
+      - name: Run Nextflow parameter test (initial run)
+        env:
+          NXF_DOCKER_ENABLED: 'false'
+          NXF_SINGULARITY_ENABLED: 'false'
+          NXF_APPTAINER_ENABLED: 'false'
+        run: |
+          nextflow run main.nf \
+            --workflow normalise \
+            --outdir ./ci_out \
+            --vcf_dir ./tests/data/minimal_vcf_dir \
+            --bam_files "tests/data/developmental_disorders/ddd_patients/*.bam" \
+            --ref_genome "tests/data/developmental_disorders/reference/human_g1k_v37_decoy.fasta" \
+            --target_bed "tests/data/developmental_disorders/targets/exome_targets.bed" \
+            -stub-run
+
+      - name: Run Nextflow parameter test (resume run)
+        env:
+          NXF_DOCKER_ENABLED: 'false'
+          NXF_SINGULARITY_ENABLED: 'false'
+          NXF_APPTAINER_ENABLED: 'false'
+        run: |
+          nextflow run main.nf \
+            --workflow normalise \
+            --outdir ./ci_out \
+            --vcf_dir ./tests/data/minimal_vcf_dir \
+            --bam_files "tests/data/developmental_disorders/ddd_patients/*.bam" \
+            --ref_genome "tests/data/developmental_disorders/reference/human_g1k_v37_decoy.fasta" \
+            --target_bed "tests/data/developmental_disorders/targets/exome_targets.bed" \
+            -resume \
+            -stub-run
+
+      - name: Run Trivy container security scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'docker.io/phelelani/nf-exomecnv:canoes'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'

@@ -1,0 +1,5 @@
+{
+  "workflow": "full",
+  "truth_labels": "truth.tsv",
+  "outdir": "./results/full"
+}

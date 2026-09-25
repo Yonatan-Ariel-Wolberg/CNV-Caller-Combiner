@@ -1,0 +1,66 @@
+# ==============================================================================
+# Dockerfile: Dockerfile.icav2
+# Description: Production-ready, security-hardened Docker image for the Illumina
+#              Connected Analytics v2 (ICAv2) Command Line Interface.
+#              Provides 'icav2' binary for cloud orchestration and data transfer.
+# Base Image:  Ubuntu 24.04 LTS (Noble Numbat)
+# Security:    Runs as non-root user (appuser, UID/GID 10001) per CIS benchmarks,
+#              minimal attack surface with --no-install-recommends, clean package caches.
+# ==============================================================================
+
+FROM ubuntu:24.04
+
+# Use bash with pipefail for robust error handling during build
+SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
+
+# Environmental variables for build & runtime
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    HOME=/home/appuser
+
+# Metadata labels mapping to standard opencontainers and biocontainers schema
+LABEL org.opencontainers.image.title="icav2-cli" \
+      org.opencontainers.image.description="Illumina Connected Analytics v2 Command Line Interface" \
+      org.opencontainers.image.version="2.43.0" \
+      org.opencontainers.image.vendor="Illumina" \
+      org.opencontainers.image.licenses="Proprietary/Illumina" \
+      org.opencontainers.image.source="https://github.com/Yonatan-Ariel-Wolberg/CNV-Caller-Combiner" \
+      software="icav2-cli" \
+      software.version="2.43.0" \
+      about.summary="Illumina Connected Analytics v2 Command Line Interface" \
+      about.home="https://help.ica.illumina.com/command-line-interface" \
+      about.license="Proprietary/Illumina" \
+      about.tags="genomics, cloud, illumina"
+
+# Install system dependencies, download target release of icav2 CLI,
+# extract binary to /usr/local/bin/icav2, set permissions, create non-root user,
+# and purge temporary files and caches to minimize image footprint.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        curl \
+        jq \
+        ca-certificates \
+        unzip \
+    && curl -fsSL "https://stratus-documentation-us-east-1-public.s3.amazonaws.com/cli/2.43.0/ica-linux-amd64.zip" -o /tmp/ica.zip \
+    && unzip /tmp/ica.zip -d /tmp \
+    && mv /tmp/linux-amd64/icav2 /usr/local/bin/icav2 \
+    && chmod 0755 /usr/local/bin/icav2 \
+    && rm -rf /tmp/ica.zip /tmp/linux-amd64 \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
+    && groupadd -g 10001 appuser \
+    && useradd -u 10001 -g 10001 -m -s /bin/bash appuser \
+    && mkdir -p /home/appuser/.icav2 \
+    && chmod -R 0777 /home/appuser/.icav2 \
+    && /usr/local/bin/icav2 --help > /dev/null
+
+# Working directory
+WORKDIR /home/appuser
+
+# Switch to non-root user for execution security (CIS Docker Benchmark 4.1)
+USER 10001:10001
+
+# Default command displays usage help
+CMD ["icav2", "--help"]
+
