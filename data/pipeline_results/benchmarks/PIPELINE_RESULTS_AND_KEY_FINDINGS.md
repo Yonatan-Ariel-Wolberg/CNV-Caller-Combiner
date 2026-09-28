@@ -161,17 +161,28 @@ The CatBoost gradient-boosted decision tree model ([`bin/train_predict_catboost.
 * **Net Reclassification Improvement (NRI)**: **$+1.1674$** ($95\%\text{ CI: } [1.087, 1.247], p = 4.50 \times 10^{-16}$).
 * **Integrated Discrimination Improvement (IDI)**: **$+0.2199$** ($95\%\text{ CI: } [0.180, 0.260], p = 9.66 \times 10^{-37}$).
 
-### Top 10 Most Impactful SHAP Feature Importances:
-1. **`caller_count` / `support_fraction`** ($\text{SHAP} = +0.42$): Strongest positive predictor. Concordance between $\ge 2$ distinct algorithms heavily increases probability of true variant.
-2. **`mean_gc_content`** ($\text{SHAP} = -0.31$): Primary penalty driver. Down-weights calls located in extreme GC regions ($>65\%$) susceptible to PCR bias.
-3. **`target_density` / `probe_count`** ($\text{SHAP} = +0.26$): Variants spanning $\ge 3$ consecutive probes receive high confidence scores.
-4. **`copy_ratio_dev`** ($\text{SHAP} = +0.22$): Distance from diploid expectation ($\text{DEL} \le 0.65$, $\text{DUP} \ge 1.35$).
-5. **`flank_depth_contrast`** (`l2r_flank_diff`, $\text{SHAP} = +0.18$): Sharp coverage transition against adjacent flanking exons.
-6. **`gatk_qual_score`** (`qual_norm_gatk_gcnv`, $\text{SHAP} = +0.16$): High GATK Bayesian posterior support.
-7. **`variant_span_bp`** (`cnv_size`, $\text{SHAP} = +0.13$): Multi-exon span increasing confidence against stochastic point fluctuations.
-8. **`depth_variance`** (`l2r_dev`, $\text{SHAP} = -0.11$): Intra-target coverage noise indicating capture hybridization instability.
-9. **`canoes_qual_score`** (`qual_norm_canoes`, $\text{SHAP} = +0.09$): Negative binomial HMM evidence for focal deletions.
-10. **`low_mappability_penalty`** (`is_low_mappability`, $\text{SHAP} = -0.07$): Down-weights repetitive and low-complexity capture intervals.
+### Complete 21 CatBoost SHAP Feature Attributions:
+1. **`caller_count` / `concordance`** ($\text{SHAP} = +0.42$): Strongest positive predictor. Consensus between $\ge 2$ distinct calling algorithms heavily increases the probability of a genuine CNV.
+2. **`mean_gc_content`** ($\text{SHAP} = -0.31$): Primary penalty driver. Down-weights calls located in extreme GC regions ($<32\%$ or $>68\%$) susceptible to hybridisation capture dropout and PCR bias.
+3. **`probe_count` / `n_probes`** ($\text{SHAP} = +0.26$): Target probe continuity. Multi-exon variants spanning $\ge 3$ consecutive target probes receive substantial confidence reinforcement.
+4. **`copy_ratio_dev` / `log2_ratio`** ($\text{SHAP} = +0.22$): Genomic copy-ratio shift from diploid expectations ($\text{DEL} \le 0.65$, $\text{DUP} \ge 1.35$).
+5. **`flank_depth_contrast`** (`l2r_flank_diff`, $\text{SHAP} = +0.18$): Step drop or rise in depth relative to flanking exons, robust against whole-exome normalization shifts.
+6. **`gatk_qual_score`** (`qual_norm_gatk_gcnv`, $\text{SHAP} = +0.16$): GATK Bayesian posterior evidence score.
+7. **`variant_span_bp`** (`cnv_size`, $\text{SHAP} = +0.13$): Physical genomic span in base pairs, filtering stochastic single-point depth fluctuations.
+8. **`depth_variance`** (`l2r_dev`, $\text{SHAP} = -0.11$): Intra-target coverage noise penalty indicating capture hybridization instability.
+9. **`canoes_qual_score`** (`qual_norm_canoes`, $\text{SHAP} = +0.09$): Negative binomial HMM evidence for focal read-depth alterations.
+10. **`low_mappability_penalty`** (`is_low_mappability`, $\text{SHAP} = -0.07$): Down-weights repetitive elements, segmental duplications, and low-mappability intervals ($\text{MAPQ} < 0.80$).
+11. **`cnvkit_weight`** (`bin_weight`, $\text{SHAP} = +0.07$): CNVkit variance-based target probe weight.
+12. **`exomedepth_qual_score`** (`qual_norm_exomedepth`, $\text{SHAP} = +0.06$): ExomeDepth beta-binomial maximum likelihood evidence score.
+13. **`gc_dev`** ($\text{SHAP} = -0.06$): Deviation of probe GC fraction from cohort optimal baseline ($|GC - 0.50|$).
+14. **`rd_ratio` / `depth_ratio`** ($\text{SHAP} = +0.05$): Normalized ratio of mean read depth in CNV interval versus flanking baseline.
+15. **`probe_density`** ($\text{SHAP} = +0.05$): Target probe packing per kilobase of genomic sequence.
+16. **`mean_qual_norm_supported`** ($\text{SHAP} = +0.04$): Mean normalized quality score across all callers endorsing the candidate call.
+17. **`concordance_ratio`** ($\text{SHAP} = +0.04$): Proportion of active callers in the cohort pipeline endorsing the variant.
+18. **`overhang_ratio`** ($\text{SHAP} = -0.03$): Penalty for unsequenced bait overhang footprint relative to target length.
+19. **`xhmm_qual_score`** (`qual_norm_xhmm`, $\text{SHAP} = +0.03$): XHMM PCA-normalized Z-score statistical quality.
+20. **`clamms_qual_score`** (`qual_norm_clamms`, $\text{SHAP} = +0.02$): CLAMMS coverage HMM quality score.
+21. **`size_label`** (`chrom_encoded`, $\text{SHAP} = +0.01$): Ordinal variant size bin and chromosome scale context.
 
 > [!TIP]
 > **Architectural Refactoring Decoupling**: Structural refinement flags (`is_precise`, `is_sv_refined`) were intentionally excluded from CatBoost training. This guarantees the model remains unbiased toward regions baited by split-read callers and provides uniform calibration across all exonic targets.
