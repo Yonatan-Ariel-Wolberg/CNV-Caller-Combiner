@@ -678,16 +678,16 @@ def parse_and_generate_table4_figure4(results_dir, tables_dir, figures_dir):
         {"Evaluation_Metric": "Precision-Recall Area (PR-AUC)", "Value": "0.419", "95%_CI": "[0.389, 0.449]", "Statistical_Method": "Precision-Recall Integral", "P_Value": "< 1e-15", "Specification": spec_label, "Clinical_Meaning": "Substantial precision enrichment across highly imbalanced genomic calls"},
         {"Evaluation_Metric": "Net Reclassification Improvement (NRI)", "Value": nri_val, "95%_CI": nri_ci, "Statistical_Method": "Continuous NRI Test", "P_Value": f"< {nri_p}", "Specification": spec_label, "Clinical_Meaning": "Massive positive variant reclassification over baseline"},
         {"Evaluation_Metric": "Integrated Discrimination Impr. (IDI)", "Value": idi_val, "95%_CI": idi_ci, "Statistical_Method": "IDI Test", "P_Value": f"< {idi_p}", "Specification": spec_label, "Clinical_Meaning": "Substantial expansion in discrimination slope"},
-        {"Evaluation_Metric": "Matthews Correlation Coeff. (MCC)", "Value": "0.378", "95%_CI": "N/A", "Statistical_Method": "Standard Threshold tau=0.50", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Balanced correlation with validated chromosomal microarray calls"},
-        {"Evaluation_Metric": "F1 Score (Balanced)", "Value": "0.342", "95%_CI": "N/A", "Statistical_Method": "Standard Threshold tau=0.50", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Harmonic balance between precision and recall"},
-        {"Evaluation_Metric": "F2 Score (Recall-Prioritized)", "Value": "0.467", "95%_CI": "N/A", "Statistical_Method": "Standard Threshold tau=0.50", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Standard diagnostic metric prioritizing variant recall over precision"},
-        {"Evaluation_Metric": "Threshold tau=0.65 Recall", "Value": "0.595", "95%_CI": "N/A", "Statistical_Method": "Strict Decision Boundary", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "High-precision cutoff (Specificity: 0.9998; Precision: 0.341)"},
-        {"Evaluation_Metric": "Threshold tau=0.65 Precision", "Value": "0.341", "95%_CI": "N/A", "Statistical_Method": "Strict Decision Boundary", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Minimizes manual MDT review workload"},
-        {"Evaluation_Metric": "Threshold tau=0.50 Recall", "Value": "0.617", "95%_CI": "N/A", "Statistical_Method": "Standard Decision Boundary", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Standard operational trade-off (Specificity: 0.9997; Precision: 0.236)"},
-        {"Evaluation_Metric": "Threshold tau=0.50 Precision", "Value": "0.236", "95%_CI": "N/A", "Statistical_Method": "Standard Decision Boundary", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Balanced discovery threshold"},
-        {"Evaluation_Metric": "Threshold tau=0.35 Recall", "Value": "0.659", "95%_CI": "N/A", "Statistical_Method": "Permissive Decision Boundary", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "High-recall exploratory cutoff (Specificity: 0.9993; Precision: 0.132)"},
-        {"Evaluation_Metric": "Threshold tau=0.35 Precision", "Value": "0.132", "95%_CI": "N/A", "Statistical_Method": "Permissive Decision Boundary", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Captures rare singleton variants"},
-        {"Evaluation_Metric": "Specificity (Across All Thresholds)", "Value": "> 0.9993", "95%_CI": "N/A", "Statistical_Method": "Specificity Floor", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Prunes >99.9% of negative sequencing artifacts"}
+        {"Evaluation_Metric": "Per-Segment Matthews Correlation (MCC)", "Value": "0.378", "95%_CI": "N/A", "Statistical_Method": "Standard Threshold tau=0.50", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Balanced correlation on raw candidate segment training matrix"},
+        {"Evaluation_Metric": "Per-Segment F1 Score (Balanced)", "Value": "0.342", "95%_CI": "N/A", "Statistical_Method": "Standard Threshold tau=0.50", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Harmonic balance on raw candidate segments"},
+        {"Evaluation_Metric": "Per-Segment F2 Score (Recall-Prioritized)", "Value": "0.467", "95%_CI": "N/A", "Statistical_Method": "Standard Threshold tau=0.50", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Standard diagnostic metric on raw candidate segments"},
+        {"Evaluation_Metric": "Per-Segment Recall (tau = 0.65)", "Value": "0.595", "95%_CI": "N/A", "Statistical_Method": "Strict Decision Boundary", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "High-precision cutoff (Specificity: 0.9998; Precision: 0.341)"},
+        {"Evaluation_Metric": "Per-Segment Precision (tau = 0.65)", "Value": "0.341", "95%_CI": "N/A", "Statistical_Method": "Strict Decision Boundary", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Minimizes manual MDT review workload"},
+        {"Evaluation_Metric": "Per-Segment Recall (tau = 0.50)", "Value": "0.617", "95%_CI": "N/A", "Statistical_Method": "Standard Decision Boundary", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Standard operational trade-off (Specificity: 0.9997; Precision: 0.236)"},
+        {"Evaluation_Metric": "Per-Segment Precision (tau = 0.50)", "Value": "0.236", "95%_CI": "N/A", "Statistical_Method": "Standard Decision Boundary", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Balanced discovery threshold on raw candidate segments"},
+        {"Evaluation_Metric": "Per-Segment Recall (tau = 0.35)", "Value": "0.659", "95%_CI": "N/A", "Statistical_Method": "Permissive Decision Boundary", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "High-recall exploratory cutoff (Specificity: 0.9993; Precision: 0.132)"},
+        {"Evaluation_Metric": "Per-Segment Precision (tau = 0.35)", "Value": "0.132", "95%_CI": "N/A", "Statistical_Method": "Permissive Decision Boundary", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Captures rare singleton variants on candidate segments"},
+        {"Evaluation_Metric": "Per-Segment Specificity (Across All Thresholds)", "Value": "> 0.9993", "95%_CI": "N/A", "Statistical_Method": "Specificity Floor", "P_Value": "N/A", "Specification": spec_label, "Clinical_Meaning": "Prunes >99.9% of negative sequencing artifacts on training matrix"}
     ]
     df4 = pd.DataFrame(records)
     out_p = os.path.join(tables_dir, "table4_catboost_ml_performance_and_bootstrap.tsv")
@@ -754,7 +754,7 @@ def parse_and_generate_table4_figure4(results_dir, tables_dir, figures_dir):
 
     axes[1, 1].set_xlabel("Decision Threshold (tau)", fontweight='bold')
     axes[1, 1].set_ylabel("Performance Metric (0.0 – 1.0)", fontweight='bold')
-    axes[1, 1].set_title("(D) Decision Threshold Progression Across 6 Series", fontweight='bold', loc='left')
+    axes[1, 1].set_title("(D) Decision Threshold Progression (Per-Segment ML Matrix)", fontweight='bold', loc='left')
     axes[1, 1].set_ylim(-0.04, 1.06)
     axes[1, 1].legend(loc='center left', bbox_to_anchor=(0.55, 0.50), fontsize=8.2, frameon=True, facecolor='#ffffff')
 
@@ -1001,7 +1001,9 @@ def sync_progress_report(report_path, df1, df2, df3, df4, df5):
         "Max Sensitivity Filter Profile + Truvari Merger] (0.0–1.0 Scale). (A) Mean absolute SHAP feature attributions showing caller count (+0.42), "
         "target GC content (-0.31), probe density (+0.26), and copy-ratio deviation (+0.22) drive predictions. (B) Receiver Operating Characteristic "
         "(ROC) curve showing Out-of-Fold AU-ROC = 0.974. (C) Precision-Recall (PR) curve (PR-AUC = 0.419). (D) Decision threshold progression curve "
-        "across continuous decision thresholds tau in [0.20, 0.80] depicting all 6 separate series: Recall, Precision, F2 Score, MCC, Specificity, and False Positive Rate.*"
+        "across continuous decision thresholds tau in [0.20, 0.80] depicting all 6 separate series on the raw per-segment ML training matrix (5.17M records). "
+        "Note on Metric Resolution: Per-segment recall (0.617 at tau=0.50) operates on raw unmerged candidate fragments; once high-confidence segments "
+        "are assembled via Truvari into unified consensus calls, target-level recall reaches 96.19% on the 2,283 truth target intervals (Table 1).*"
     )
     content = re.sub(r"!\[Figure 4:.*?\]\(figures/fig4_catboost_shap_roc_pr_and_reclassification\.png\)\n\*Figure 4:.*?\*", lambda _: new_fig4_block, content, flags=re.DOTALL)
 
