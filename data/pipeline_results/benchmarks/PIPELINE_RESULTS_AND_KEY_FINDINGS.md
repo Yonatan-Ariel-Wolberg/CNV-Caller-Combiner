@@ -50,7 +50,7 @@ $$\mathbf{Optimal\text{ }Local\text{ }Combination} = \mathbf{CANOES} + \mathbf{E
                               │  Support Threshold: k >= 2  │
                               │  Sensitivity: 96.7%         │
                               │  Precision:   88.4%         │
-                              │  F2 Score:    0.852         │
+                              │  F2 Score:    0.949         │
                               └─────────────────────────────┘
 ```
 
@@ -63,11 +63,14 @@ Each caller relies on an orthogonal mathematical paradigm, neutralizing the weak
 
 ### Local Ensemble vs. DRAGEN Germline Enrichment 4.4.6
 
+> [!NOTE]
+> **DRAGEN 4.4.6 External Benchmark Specification**: DRAGEN 4.4.6 was evaluated as an external commercial benchmark on the full 90-sample cohort using vendor Control capture baits prior to the implementation of cohort QC gating and Mosdepth consensus BED generation. Its performance reflects vendor-standard operation without custom target pruning.
+
 | Feature / Metric | Optimal Local Combination (CANOES + ExomeDepth + CNVkit + GATK) | DRAGEN Germline Enrichment 4.4.6 | Analytical Advantage |
 | :--- | :---: | :---: | :--- |
 | **Sensitivity (Truthset)** | **$96.7\%$** | $93.3\%$ | **Local Ensemble (+3.4% gain)** captures single-exon deletions down-weighted by DRAGEN PON. |
 | **Precision** | $88.4\%$ | **$91.2\%$** | DRAGEN achieves slightly higher precision due to proprietary FPGA-accelerated GC/PON correction. |
-| **$F_2$ Harmonic Score** | **$0.852$** | $0.835$ | **Local Ensemble favors sensitivity** for comprehensive clinical screening. |
+| **$F_2$ Harmonic Score** | **$0.949$** | $0.929$ | **Local Ensemble favors sensitivity** for comprehensive clinical screening. |
 | **Hardware Dependency** | **100% Open-Source / Standard Linux HPC** | Requires Illumina FPGA hardware / ICA Cloud | Local ensemble runs on any SLURM/PBS/Cloud HPC infrastructure. |
 | **Breakpoint Refinement** | Post-Consensus Module with DRAGEN/SvABA SVs | Integrated read-depth + split-read calling | Both pipelines successfully achieve base-pair resolution when SV calls are integrated. |
 
@@ -132,7 +135,7 @@ The pipeline provides three pre-tuned filtering profiles to accommodate differen
 
 ---
 
-## 6. Key Finding 5: Caller Support Tiers ($1 \to 7$ Callers) & Page's L Trend
+## 6. Key Finding 5: Caller Support Tiers ($1 \to 6$ Callers) & Page's L Trend
 
 Analyzing probe discordance across support tiers confirms the power of ensemble consensus:
 
@@ -144,10 +147,9 @@ Analyzing probe discordance across support tiers confirms the power of ensemble 
 | **$k \ge 4$** | $92.40\%$ | $84.50\%$ | $47.8\%$ | Confirmatory Diagnostic Tier |
 | **$k \ge 5$** | $93.10\%$ | $76.20\%$ | $36.1\%$ | High Specificity Tier |
 | **$k \ge 6$** | $93.80\%$ | $68.40\%$ | $27.5\%$ | Strict Consensus Tier |
-| **$k = 7$ (All Callers)** | **$94.02\%$** | $57.10\%$ | $19.2\%$ | Overly Restrictive (42.9% sensitivity loss) |
 
 > [!IMPORTANT]
-> **Page's L Trend Test**: $L = 3474.0, p = 2.13 \times 10^{-32}$. Precision strictly increases with caller support. Requiring $k \ge 2$ eliminates $>80\%$ of single-caller technical artifacts while preserving $>96\%$ of true pathogenic variants.
+> **Page's L Trend Test**: $L = 3474.0, p = 2.13 \times 10^{-32}$. Precision strictly increases with caller support. Requiring $k \ge 2$ eliminates $>80\%$ of single-caller technical artifacts while preserving $>96\%$ of true pathogenic variants. If unanimous agreement ($k = 6$) is required, sensitivity drops to $68.40\%$ (31.6% sensitivity loss).
 
 ---
 
