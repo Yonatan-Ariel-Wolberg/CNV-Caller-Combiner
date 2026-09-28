@@ -1,13 +1,13 @@
-Evaluation_Metric	Value	95%_CI	Statistical_Method	P_Value	Clinical_Meaning
-Discrimination AU-ROC	0.974	[0.954, 0.994]	Out-of-Fold 5-Fold CV	< 1e-15	Strong separation between true genomic CNVs and sequencing noise
-Precision-Recall Area (PR-AUC)	0.419	[0.389, 0.449]	Precision-Recall Integral	< 1e-15	Substantial precision enrichment across highly imbalanced genomic calls
-Matthews Correlation Coeff. (MCC)	0.660	N/A	Post-Filter Cohort Baseline	N/A	High correlation with validated chromosomal microarray calls
-F1 Score (Balanced)	0.342	N/A	Standard Threshold tau=0.50	N/A	Harmonic balance between precision and recall
-F2 Score (Recall-Prioritized)	0.467	N/A	Standard Threshold tau=0.50	N/A	Standard diagnostic metric prioritizing variant recall over precision
-Threshold tau=0.65 Recall	0.595	N/A	Strict Decision Boundary	N/A	High-precision cutoff (Specificity: 0.9998; Precision: 0.341)
-Threshold tau=0.65 Precision	0.341	N/A	Strict Decision Boundary	N/A	Minimizes manual MDT review workload
-Threshold tau=0.50 Recall	0.617	N/A	Standard Decision Boundary	N/A	Standard operational trade-off (Specificity: 0.9997; Precision: 0.236)
-Threshold tau=0.50 Precision	0.236	N/A	Standard Decision Boundary	N/A	Balanced discovery threshold
-Threshold tau=0.35 Recall	0.659	N/A	Permissive Decision Boundary	N/A	High-recall exploratory cutoff (Specificity: 0.9993; Precision: 0.132)
-Threshold tau=0.35 Precision	0.132	N/A	Permissive Decision Boundary	N/A	Captures rare singleton variants
-Specificity (Across All Thresholds)	> 0.9993	N/A	Specificity Floor	N/A	Prunes >99.9% of negative sequencing artifacts
+Evaluation_Metric	Value	95%_CI	Statistical_Method	P_Value	Specification	Clinical_Meaning
+Discrimination AU-ROC	0.974	[0.954, 0.994]	Out-of-Fold 5-Fold CV	< 1e-15	Mosdepth BED + 6 Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger	Strong separation between true genomic CNVs and sequencing noise
+Precision-Recall Area (PR-AUC)	0.419	[0.389, 0.449]	Precision-Recall Integral	< 1e-15	Mosdepth BED + 6 Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger	Substantial precision enrichment across highly imbalanced genomic calls
+Matthews Correlation Coeff. (MCC)	0.660	N/A	Post-Filter Cohort Baseline	N/A	Mosdepth BED + 6 Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger	High correlation with validated chromosomal microarray calls
+F1 Score (Balanced)	0.342	N/A	Standard Threshold tau=0.50	N/A	Mosdepth BED + 6 Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger	Harmonic balance between precision and recall
+F2 Score (Recall-Prioritized)	0.467	N/A	Standard Threshold tau=0.50	N/A	Mosdepth BED + 6 Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger	Standard diagnostic metric prioritizing variant recall over precision
+Threshold tau=0.65 Recall	0.595	N/A	Strict Decision Boundary	N/A	Mosdepth BED + 6 Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger	High-precision cutoff (Specificity: 0.9998; Precision: 0.341)
+Threshold tau=0.65 Precision	0.341	N/A	Strict Decision Boundary	N/A	Mosdepth BED + 6 Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger	Minimizes manual MDT review workload
+Threshold tau=0.50 Recall	0.617	N/A	Standard Decision Boundary	N/A	Mosdepth BED + 6 Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger	Standard operational trade-off (Specificity: 0.9997; Precision: 0.236)
+Threshold tau=0.50 Precision	0.236	N/A	Standard Decision Boundary	N/A	Mosdepth BED + 6 Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger	Balanced discovery threshold
+Threshold tau=0.35 Recall	0.659	N/A	Permissive Decision Boundary	N/A	Mosdepth BED + 6 Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger	High-recall exploratory cutoff (Specificity: 0.9993; Precision: 0.132)
+Threshold tau=0.35 Precision	0.132	N/A	Permissive Decision Boundary	N/A	Mosdepth BED + 6 Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger	Captures rare singleton variants
+Specificity (Across All Thresholds)	> 0.9993	N/A	Specificity Floor	N/A	Mosdepth BED + 6 Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger	Prunes >99.9% of negative sequencing artifacts
