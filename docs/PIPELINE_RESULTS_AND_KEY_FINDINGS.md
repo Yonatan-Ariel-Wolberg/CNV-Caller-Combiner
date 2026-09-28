@@ -161,11 +161,17 @@ The CatBoost gradient-boosted decision tree model ([`bin/train_predict_catboost.
 * **Net Reclassification Improvement (NRI)**: **$+1.1674$** ($95\%\text{ CI: } [1.087, 1.247], p = 4.50 \times 10^{-16}$).
 * **Integrated Discrimination Improvement (IDI)**: **$+0.2199$** ($95\%\text{ CI: } [0.180, 0.260], p = 9.66 \times 10^{-37}$).
 
-### Top SHAP Feature Importances:
-1. **`caller_count` / `support_fraction`** (Mean $|\text{SHAP}| = +0.42$): Strongest positive predictor. Concordance between $\ge 2$ distinct algorithms heavily increases probability of true variant.
-2. **`mean_gc_content`** (Mean $|\text{SHAP}| = -0.31$): Primary penalty driver. Down-weights calls located in extreme GC regions ($>65\%$) susceptible to PCR bias.
-3. **`target_density` / `probe_count`** (Mean $|\text{SHAP}| = +0.26$): Variants spanning $\ge 3$ consecutive probes receive high confidence scores.
-4. **`copy_ratio_dev`** (Mean $|\text{SHAP}| = +0.22$): Distance from diploid expectation ($\text{DEL} \le 0.65$, $\text{DUP} \ge 1.35$).
+### Top 10 Most Impactful SHAP Feature Importances:
+1. **`caller_count` / `support_fraction`** ($\text{SHAP} = +0.42$): Strongest positive predictor. Concordance between $\ge 2$ distinct algorithms heavily increases probability of true variant.
+2. **`mean_gc_content`** ($\text{SHAP} = -0.31$): Primary penalty driver. Down-weights calls located in extreme GC regions ($>65\%$) susceptible to PCR bias.
+3. **`target_density` / `probe_count`** ($\text{SHAP} = +0.26$): Variants spanning $\ge 3$ consecutive probes receive high confidence scores.
+4. **`copy_ratio_dev`** ($\text{SHAP} = +0.22$): Distance from diploid expectation ($\text{DEL} \le 0.65$, $\text{DUP} \ge 1.35$).
+5. **`flank_depth_contrast`** (`l2r_flank_diff`, $\text{SHAP} = +0.18$): Sharp coverage transition against adjacent flanking exons.
+6. **`gatk_qual_score`** (`qual_norm_gatk_gcnv`, $\text{SHAP} = +0.16$): High GATK Bayesian posterior support.
+7. **`variant_span_bp`** (`cnv_size`, $\text{SHAP} = +0.13$): Multi-exon span increasing confidence against stochastic point fluctuations.
+8. **`depth_variance`** (`l2r_dev`, $\text{SHAP} = -0.11$): Intra-target coverage noise indicating capture hybridization instability.
+9. **`canoes_qual_score`** (`qual_norm_canoes`, $\text{SHAP} = +0.09$): Negative binomial HMM evidence for focal deletions.
+10. **`low_mappability_penalty`** (`is_low_mappability`, $\text{SHAP} = -0.07$): Down-weights repetitive and low-complexity capture intervals.
 
 > [!TIP]
 > **Architectural Refactoring Decoupling**: Structural refinement flags (`is_precise`, `is_sv_refined`) were intentionally excluded from CatBoost training. This guarantees the model remains unbiased toward regions baited by split-read callers and provides uniform calibration across all exonic targets.
