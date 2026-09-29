@@ -508,10 +508,9 @@ def generate_markdown_report(df: pd.DataFrame, output_path: str):
     md = [
         "# Comprehensive Pipeline Statistical Significance & Comparative Benchmark Report",
         "",
-        "> [!NOTE]",
-        "> This report evaluates the formal statistical significance, diagnostic odds ratios (DOR),",
-        "> relative risk (RR), and 95% Confidence Intervals across the 7 primary comparison dimensions",
-        "> of the **CNV-Caller-Combiner** pipeline.",
+        "*This report evaluates the formal statistical significance, diagnostic odds ratios (DOR),*",
+        "*relative risk (RR), and 95% Confidence Intervals across the 7 primary comparison dimensions*",
+        "*of the **CNV-Caller-Combiner** pipeline.*",
         "",
         "## Executive Summary",
         "",

@@ -6,7 +6,11 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 output_dir = "/spaces/ywolberg/cnv_caller_combiner_results_20260819"
-artifact_dir = "/home/ywolberg/.gemini/antigravity-cli/brain/8adca2b8-4b85-4abf-a476-4d4094a3b713"
+artifact_dir = os.environ.get("ARTIFACT_DIR")
+
+def safe_copy(src, filename):
+    if artifact_dir and os.path.exists(artifact_dir):
+        shutil.copy(src, os.path.join(artifact_dir, filename))
 
 metrics = ['Sensitivity', 'Precision', 'F-beta2', 'Specificity', 'MCC']
 categories = ['Best 1-Caller\n(CANOES)', 'Best 2-Callers\n(CANOES+XHMM)', 'Best 3-Callers\n(C+X+G)', 'Best 4-Callers\n(C+X+G+CL)', '5-Callers Consensus\n(All Local)', 'DRAGEN Caller\n(No Sample QC)']
@@ -72,7 +76,7 @@ def render_concordance(fig_num, filename):
     plt.tight_layout()
     p = os.path.join(output_dir, filename)
     plt.savefig(p, dpi=300, bbox_inches='tight')
-    shutil.copy(p, os.path.join(artifact_dir, filename))
+    safe_copy(p, filename)
     plt.close()
 
 # ---------------------------------------------------------
@@ -152,7 +156,7 @@ def render_tier_ensemble(fig_num, filename):
     fig.subplots_adjust(bottom=0.08, hspace=0.18)
     p = os.path.join(output_dir, filename)
     plt.savefig(p, dpi=300, bbox_inches='tight')
-    shutil.copy(p, os.path.join(artifact_dir, filename))
+    safe_copy(p, filename)
     plt.close()
 
 # ---------------------------------------------------------
@@ -198,7 +202,7 @@ def render_merger(fig_num, filename):
     plt.tight_layout()
     p = os.path.join(output_dir, filename)
     plt.savefig(p, dpi=300, bbox_inches='tight')
-    shutil.copy(p, os.path.join(artifact_dir, filename))
+    safe_copy(p, filename)
     plt.close()
 
 # ---------------------------------------------------------
@@ -244,7 +248,7 @@ def render_bed(fig_num, filename):
     plt.tight_layout()
     p = os.path.join(output_dir, filename)
     plt.savefig(p, dpi=300, bbox_inches='tight')
-    shutil.copy(p, os.path.join(artifact_dir, filename))
+    safe_copy(p, filename)
     plt.close()
 
 # ---------------------------------------------------------
@@ -274,7 +278,7 @@ def render_progression():
     plt.tight_layout()
     p = os.path.join(output_dir, "slide_fig4_progression.png")
     plt.savefig(p, dpi=300, bbox_inches='tight')
-    shutil.copy(p, os.path.join(artifact_dir, "slide_fig4_progression.png"))
+    safe_copy(p, "slide_fig4_progression.png")
     plt.close()
 
 # Run all

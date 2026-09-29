@@ -18,16 +18,13 @@
 
 The **CNV-Caller-Combiner** is an enterprise-grade, Nextflow DSL2-powered exome sequencing pipeline that integrates **eight complementary germline CNV and structural variant callers**, performs target-aware quality control and sample gating, normalizes caller confidences into standardized Phred-scaled quality scores, resolves multi-caller consensus with nucleotide-level breakpoint refinement, prioritizes true variants using gradient-boosted decision trees (CatBoost / XGBoost), and automates clinical ACMG 2019/2020 diagnostic tiering.
 
-> [!NOTE]
-> This pipeline is optimized for exome sequencing cohorts under HPC environments (e.g., the ZA-WITS-CORE SLURM cluster) and cloud platforms (AWS / Illumina Connected Analytics ICAv2).
-
+*This pipeline is optimized for exome sequencing cohorts under HPC environments (e.g., the ZA-WITS-CORE SLURM cluster) and cloud platforms (AWS / Illumina Connected Analytics ICAv2).*
 
 ---
 
 ## 🧬 Beginner's Guide (No Bioinformatics or Coding Experience Required)
 
-> [!TIP]
-> A standalone version of this guide is also available at [BEGINNER_GUIDE.md](file:///home/ywolberg/CNV-Caller-Combiner/BEGINNER_GUIDE.md).
+*A standalone version of this guide is also available at [BEGINNER_GUIDE.md](file:///home/ywolberg/CNV-Caller-Combiner/BEGINNER_GUIDE.md).*
 
 Welcome! If you are a clinician, researcher, or student with limited bioinformatics or programming experience, this section is written for you. 
 

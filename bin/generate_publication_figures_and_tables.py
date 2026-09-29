@@ -925,8 +925,7 @@ def sync_progress_report(report_path, df1, df2, df3, df4, df5):
     # 1. Reconstruct Table 1 Markdown
     md_t1_rows = [
         "##### Table 1: Diagnostic Performance Metrics Across 10 Calling Strategies, Ensembles, & DRAGEN 4.4.6 (0.0–1.0 Scale)",
-        "> [!IMPORTANT]",
-        "> **Primary Operational Specification**: Evaluated across the 63 QC-passed DDD-UK probands against validated array-CGH/MLPA truth records. Local callers evaluated under **Mosdepth Consensus BED + Max Sensitivity Filter Profile + Truvari (Coordinate-Only) Merger**; DRAGEN 4.4.6 evaluated as an external commercial benchmark on the full 90-sample cohort with vendor Control capture baits.\n",
+        "**Primary Operational Specification**: Evaluated across the 63 QC-passed DDD-UK probands against validated array-CGH/MLPA truth records. Local callers evaluated under **Mosdepth Consensus BED + Max Sensitivity Filter Profile + Truvari (Coordinate-Only) Merger**; DRAGEN 4.4.6 evaluated as an external commercial benchmark on the full 90-sample cohort with vendor Control capture baits.\n",
         "| Calling Strategy / Method | Mathematical Model / Architecture | TP Calls | FP Calls | FN Calls | TN Calls | Recall | Precision | Specificity | $F_2$ Score | MCC | Role / Algorithmic Niche |",
         "| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |"
     ]
@@ -952,7 +951,7 @@ def sync_progress_report(report_path, df1, df2, df3, df4, df5):
         "(96.70% recall, 88.40% precision, 0.9493 $F_2$) and CatBoost ML filter (96.19% recall, 89.09% precision, 0.9469 $F_2$) achieve peak "
         "clinical harmonic utility on standard Linux HPC infrastructure.*"
     )
-    content = re.sub(r"\*Note on Table 1:.*?\*", lambda _: new_note1, content, flags=re.DOTALL)
+    content = re.sub(r"\*Note on Table 1:.*?(?=\n\n!\[Figure 1)", lambda _: new_note1, content, flags=re.DOTALL)
 
     new_fig1_block = (
         "![Figure 1: Comparative Diagnostic Performance Across 10 Calling Strategies](figures/fig1_individual_callers_quality_metrics.png)\n"
@@ -967,8 +966,7 @@ def sync_progress_report(report_path, df1, df2, df3, df4, df5):
     # 2. Reconstruct Table 2 Markdown
     md_t2_rows = [
         "##### Table 2: Diagnostic Performance Across Caller Support Tiers (k = 1 → 6) (0.0–1.0 Scale)",
-        "> [!IMPORTANT]",
-        "> **Operational Specification**: Evaluated under **Mosdepth Consensus BED + Max Sensitivity Filter Profile + Truvari (Coordinate-Only) Merger** across caller concordance support tiers ($k = 1 \\to 6$) for the 6 local open-source callers.\n",
+        "**Operational Specification**: Evaluated under **Mosdepth Consensus BED + Max Sensitivity Filter Profile + Truvari (Coordinate-Only) Merger** across caller concordance support tiers ($k = 1 \\to 6$) for the 6 local open-source callers.\n",
         "| Support Tier ($k$) | Precision | Recall | Cumulative Retention | $F_2$ Score | Operational Interpretation |",
         "| :---: | :---: | :---: | :---: | :---: | :--- |"
     ]
@@ -996,7 +994,7 @@ def sync_progress_report(report_path, df1, df2, df3, df4, df5):
         "single-caller technical artifacts. Enforcing higher voting thresholds ($k \\ge 3$ or higher) leads to progressive recall collapse, "
         "culminating in 31.6% recall loss if unanimous agreement ($k = 6$) is demanded.*"
     )
-    content = re.sub(r"\*Note on Table 2:.*?\*", lambda _: new_note2, content, flags=re.DOTALL)
+    content = re.sub(r"\*Note on Table 2:.*?(?=\n\n!\[Figure 2)", lambda _: new_note2, content, flags=re.DOTALL)
 
     new_fig2_block = (
         "![Figure 2: Caller Concordance Support Tiers Dynamics](figures/fig2_support_tiers_concordance_and_performance.png)\n"
@@ -1010,12 +1008,11 @@ def sync_progress_report(report_path, df1, df2, df3, df4, df5):
     # 3. Reconstruct Table 3 Markdown
     md_t3_rows = [
         "##### Table 3: Multi-Factorial Optimization Benchmarks Across BEDs, Mergers, and Profiles (0.0–1.0 Scale)",
-        "> [!IMPORTANT]",
-        "> **Multi-Factorial Benchmark Specifications**:",
-        "> * **BED Benchmark (Control BED vs Mosdepth)**: Evaluated under **Ensemble or 6-Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger**",
-        "> * **Merger Benchmark (Truvari vs SURVIVOR)**: Evaluated under **Mosdepth BED + Ensemble or 6-Caller Union (+ ML) + Max Sensitivity Filter Profile**",
-        "> * **Filter Profile Benchmark (Balanced vs Max Sensitivity vs High Precision)**: Evaluated under **Mosdepth BED + Ensemble or 6-Caller Union (+ ML) + Truvari Merger**",
-        "> * **Clinical ACMG Stratum Benchmark**: Evaluated under **Mosdepth BED + 6-Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger**\n",
+        "**Multi-Factorial Benchmark Specifications**:",
+        "* **BED Benchmark (Control BED vs Mosdepth)**: Evaluated under **Ensemble or 6-Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger**",
+        "* **Merger Benchmark (Truvari vs SURVIVOR)**: Evaluated under **Mosdepth BED + Ensemble or 6-Caller Union (+ ML) + Max Sensitivity Filter Profile**",
+        "* **Filter Profile Benchmark (Balanced vs Max Sensitivity vs High Precision)**: Evaluated under **Mosdepth BED + Ensemble or 6-Caller Union (+ ML) + Truvari Merger**",
+        "* **Clinical ACMG Stratum Benchmark**: Evaluated under **Mosdepth BED + 6-Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger**\n",
         "| Benchmark Category | Configuration Tested | Operating Specification | Recall | Precision | Specificity | $F_2$ Score | MCC | Key Finding |",
         "| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |"
     ]
@@ -1043,8 +1040,7 @@ def sync_progress_report(report_path, df1, df2, df3, df4, df5):
     # 4. Reconstruct Table 4 Markdown
     md_t4_rows = [
         "##### Table 4: CatBoost Machine Learning Validation Performance & Clinical Utility (0.0–1.0 Scale)",
-        "> [!IMPORTANT]",
-        "> **Operational Specification**: Evaluated under **Mosdepth BED + 6-Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger** across 5,174,924 candidate segment/interval records.\n",
+        "**Operational Specification**: Evaluated under **Mosdepth BED + 6-Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger** across 5,174,924 candidate segment/interval records.\n",
         "| Evaluation Metric | Observed Value | 95% Confidence Interval | Statistical Method | P-Value / Operating Context | Clinical / Diagnostic Meaning |",
         "| :--- | :---: | :---: | :---: | :---: | :--- |"
     ]
@@ -1074,8 +1070,7 @@ def sync_progress_report(report_path, df1, df2, df3, df4, df5):
     # 5. Reconstruct Table 5 Markdown
     md_t5_rows = [
         "##### Table 5: Candidate Volume Attrition and Diagnostic Accuracy Across 8 Pipeline Stages (0.0–1.0 Scale)",
-        "> [!IMPORTANT]",
-        "> **Operational Specification**: Evaluated under **Mosdepth BED + 6-Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger** across 8 workflow stages on the 63 QC-passed DDD-UK probands.\n",
+        "**Operational Specification**: Evaluated under **Mosdepth BED + 6-Caller Union (+ ML) + Max Sensitivity Filter Profile + Truvari Merger** across 8 workflow stages on the 63 QC-passed DDD-UK probands.\n",
         "| Stage Index & Pipeline Phase | Candidate Variants (Mosdepth) | Step Attrition (%) | Cumulative Retention (%) | Control Arm Calls | Biological Purpose & Clinical Milestone |",
         "| :---: | :---: | :---: | :---: | :---: | :--- |"
     ]

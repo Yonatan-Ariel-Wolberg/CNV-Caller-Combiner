@@ -4,8 +4,7 @@ The **CNV-Caller-Combiner** pipeline generates standalone, zero-retention intera
 
 These reports embed micro-slices of alignment data (BAM reads), exome capture target intervals (probes BED), gene annotations (RefSeq/GENCODE), and clinical variant predictions into a single self-contained `.html` file.
 
-> [!IMPORTANT]
-> **Zero Data Leakage Guarantee**: The IGV HTML report runs **100% offline in your local web browser**. It never uploads, transfers, or pings any genomic data or metadata to external servers or cloud services. You can safely open and inspect sensitive patient datasets on an air-gapped clinical workstation.
+**Zero Data Leakage Guarantee**: The IGV HTML report runs **100% offline in your local web browser**. It never uploads, transfers, or pings any genomic data or metadata to external servers or cloud services. You can safely open and inspect sensitive patient datasets on an air-gapped clinical workstation.
 
 ---
 

@@ -240,9 +240,10 @@ def generate_upset_plot(caller_probes, title, output_path, dest_path):
     plt.savefig(output_path, dpi=300)
     print(f"Saved UpSet plot to {output_path}")
     
-    # Copy to artifacts
-    import shutil
-    shutil.copy(output_path, dest_path)
+    # Copy to artifacts if destination provided
+    if dest_path and os.path.exists(os.path.dirname(dest_path)):
+        import shutil
+        shutil.copy(output_path, dest_path)
     plt.close()
 
 def main():
@@ -288,7 +289,7 @@ def main():
     }
     
     output_dir = "/spaces/ywolberg/cnv_caller_combiner_results_20260819"
-    artifact_dir = "/home/ywolberg/.gemini/antigravity-cli/brain/8adca2b8-4b85-4abf-a476-4d4094a3b713"
+    artifact_dir = os.environ.get("ARTIFACT_DIR", output_dir)
 
     # Process Raw
     print("Processing Raw Callset...")

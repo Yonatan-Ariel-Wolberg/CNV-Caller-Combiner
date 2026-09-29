@@ -4,9 +4,8 @@ The **CNV-Caller-Combiner** pipeline generates publication-ready, standardized v
 
 These cards provide rapid, at-a-glance orthogonal validation of candidate copy number variants by contrasting the target sample's exonic read depth against the **Cohort Reference Panel (Option 2)**.
 
-> [!TIP]
-> **Why the Cohort Reference Panel (Option 2)?**:
-> Rather than relying on generic external reference panels (e.g. 1000 Genomes WGS), our pipeline constructs a baseline directly from the cohort's own sequenced BAMs. This perfectly normalizes for capture kit hybridisation kinetics, GC-content biases, sequencer batch effects, and target library prep conditions.
+**Why the Cohort Reference Panel (Option 2)?**:
+Rather than relying on generic external reference panels (e.g. 1000 Genomes WGS), our pipeline constructs a baseline directly from the cohort's own sequenced BAMs. This perfectly normalizes for capture kit hybridisation kinetics, GC-content biases, sequencer batch effects, and target library prep conditions.
 
 ---
 

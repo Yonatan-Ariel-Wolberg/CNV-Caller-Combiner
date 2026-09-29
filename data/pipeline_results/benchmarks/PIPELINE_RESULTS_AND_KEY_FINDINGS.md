@@ -1,7 +1,7 @@
 # CNV-Caller-Combiner: Comprehensive Pipeline Benchmark Results & Key Findings
 
-> [!NOTE]
-> **Cohort & Study Overview**: This report synthesizes results across 24 benchmarking suites (Suites A1–A6 and B1–B6 $\times$ 2 arms: Rule-Based Baseline vs. CatBoost ML In Silico Validation) evaluated on 90 clinical whole-exome sequencing (WES) samples from the **Deciphering Developmental Disorders (DDD-UK)** cohort. Variant calls were benchmarked against the gold-standard Deciphering Developmental Disorders / European Genome-phenome Archive (EGA) curated truthset.
+### Cohort & Study Overview
+This report synthesizes results across 24 benchmarking suites (Suites A1–A6 and B1–B6 $\times$ 2 arms: Rule-Based Baseline vs. CatBoost ML In Silico Validation) evaluated on 90 clinical whole-exome sequencing (WES) samples from the **Deciphering Developmental Disorders (DDD-UK)** cohort. Variant calls were benchmarked against the gold-standard Deciphering Developmental Disorders / European Genome-phenome Archive (EGA) curated truthset.
 
 ---
 
@@ -63,8 +63,7 @@ Each caller relies on an orthogonal mathematical paradigm, neutralizing the weak
 
 ### Local Ensemble vs. DRAGEN Germline Enrichment 4.4.6
 
-> [!NOTE]
-> **DRAGEN 4.4.6 External Benchmark Specification**: DRAGEN 4.4.6 was evaluated as an external commercial benchmark on the full 90-sample cohort using vendor Control capture baits prior to the implementation of cohort QC gating and Mosdepth consensus BED generation. Its performance reflects vendor-standard operation without custom target pruning.
+*DRAGEN 4.4.6 External Benchmark Specification*: DRAGEN 4.4.6 was evaluated as an external commercial benchmark on the full 90-sample cohort using vendor Control capture baits prior to the implementation of cohort QC gating and Mosdepth consensus BED generation. Its performance reflects vendor-standard operation without custom target pruning.
 
 | Feature / Metric | Optimal Local Combination (CANOES + ExomeDepth + CNVkit + GATK) | DRAGEN Germline Enrichment 4.4.6 | Analytical Advantage |
 | :--- | :---: | :---: | :--- |
@@ -148,8 +147,7 @@ Analyzing probe discordance across support tiers confirms the power of ensemble 
 | **$k \ge 5$** | $93.10\%$ | $76.20\%$ | $36.1\%$ | High Specificity Tier |
 | **$k \ge 6$** | $93.80\%$ | $68.40\%$ | $27.5\%$ | Strict Consensus Tier |
 
-> [!IMPORTANT]
-> **Page's L Trend Test**: $L = 3474.0, p = 2.13 \times 10^{-32}$. Precision strictly increases with caller support. Requiring $k \ge 2$ eliminates $>80\%$ of single-caller technical artifacts while preserving $>96\%$ of true pathogenic variants. If unanimous agreement ($k = 6$) is required, sensitivity drops to $68.40\%$ (31.6% sensitivity loss).
+**Page's L Trend Test Analysis**: $L = 3474.0, p = 2.13 \times 10^{-32}$. Precision strictly increases with caller support. Requiring $k \ge 2$ eliminates $>80\%$ of single-caller technical artifacts while preserving $>96\%$ of true pathogenic variants. If unanimous agreement ($k = 6$) is required, sensitivity drops to $68.40\%$ (31.6% sensitivity loss).
 
 ---
 
@@ -184,8 +182,7 @@ The CatBoost gradient-boosted decision tree model ([`bin/train_predict_catboost.
 20. **`clamms_qual_score`** (`qual_norm_clamms`, $\text{SHAP} = +0.02$): CLAMMS coverage HMM quality score.
 21. **`size_label`** (`chrom_encoded`, $\text{SHAP} = +0.01$): Ordinal variant size bin and chromosome scale context.
 
-> [!TIP]
-> **Architectural Refactoring Decoupling**: Structural refinement flags (`is_precise`, `is_sv_refined`) were intentionally excluded from CatBoost training. This guarantees the model remains unbiased toward regions baited by split-read callers and provides uniform calibration across all exonic targets.
+**Architectural Refactoring Decoupling**: Structural refinement flags (`is_precise`, `is_sv_refined`) were intentionally excluded from CatBoost training. This guarantees the model remains unbiased toward regions baited by split-read callers and provides uniform calibration across all exonic targets.
 
 ---
 
@@ -285,7 +282,7 @@ flowchart TD
 
 ## 11. Artifact & Data References
 
-* **Primary Artifact Document**: [cnv_caller_combiner_results_and_key_findings.md](file:///home/ywolberg/.gemini/antigravity-cli/brain/76f9cebf-d356-4a00-916e-3019ce455b90/cnv_caller_combiner_results_and_key_findings.md)
+* **Comprehensive Pipeline Findings**: [PIPELINE_RESULTS_AND_KEY_FINDINGS.md](file:///home/ywolberg/CNV-Caller-Combiner/docs/PIPELINE_RESULTS_AND_KEY_FINDINGS.md)
 * **Statistical Significance Engine Report**: [pipeline_statistical_significance_report.md](file:///spaces/ywolberg/qc-gated-cnv-combiner/benchmarks/pipeline_statistical_significance_report.md)
 * **Comparative Statistics TSV**: [pipeline_statistical_comparisons.tsv](file:///spaces/ywolberg/qc-gated-cnv-combiner/benchmarks/pipeline_statistical_comparisons.tsv)
 * **Mosdepth Consensus Refined VCFs**: `/spaces/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/dragen-results/100x-run/consensus_refined/`
