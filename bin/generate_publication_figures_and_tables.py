@@ -346,38 +346,61 @@ def generate_table1_and_figure1(df1, tables_dir, figures_dir):
     df1.to_csv(out_q, sep="\t", index=False)
     print(f"  Saved: {out_q}")
 
-    # Figure 1: Multi-metric comparative grouped bar chart
-    fig, ax = plt.subplots(figsize=(19, 7.8))
-    fig.subplots_adjust(top=0.86, bottom=0.20, left=0.06, right=0.98)
+    # Figure 1: Grouped bar chart with 7 Metrics on X-axis and 10 Calling Strategies as Series
+    fig, ax = plt.subplots(figsize=(20, 8.5))
+    fig.subplots_adjust(top=0.86, bottom=0.14, left=0.06, right=0.98)
 
-    strategies = df1["Calling_Strategy"].tolist()
-    x = np.arange(len(strategies))
+    # 7 requested metric clusters in exact order
     metrics_to_plot = [
-        ("Recall", "#10b981", "Recall (Sensitivity)"),
-        ("Precision", "#0284c7", "Precision (PPV)"),
-        ("Specificity", "#6366f1", "Specificity (TNR)"),
-        ("F2_Score", "#f59e0b", "F2 Score (beta=2)"),
-        ("MCC", "#ec4899", "MCC"),
-        ("False_Positive_Rate", "#ef4444", "False Positive Rate (FPR)")
+        ("Recall", "Recall"),
+        ("Precision", "Precision"),
+        ("F2_Score", "$F_2$"),
+        ("MCC", "MCC"),
+        ("Specificity", "Specificity"),
+        ("False_Positive_Rate", "FPR"),
+        ("False_Negative_Rate", "FNR")
     ]
-    n_bars = len(metrics_to_plot)
-    width = 0.13
+    m_keys = [m[0] for m in metrics_to_plot]
+    m_labels = [m[1] for m in metrics_to_plot]
+    x = np.arange(len(m_keys))
 
-    for i, (m_col, col_color, m_label) in enumerate(metrics_to_plot):
-        offset = (i - (n_bars - 1) / 2) * width
-        vals = df1[m_col].tolist()
-        rects = ax.bar(x + offset, vals, width, label=m_label, color=col_color, alpha=0.92, edgecolor='black', linewidth=0.5)
+    # 10 requested calling strategies in exact order
+    strategies = [
+        ("CANOES", "#2563eb"),
+        ("CLAMMS", "#64748b"),
+        ("CNVkit", "#0891b2"),
+        ("ExomeDepth", "#7c3aed"),
+        ("GATK-gCNV", "#d97706"),
+        ("XHMM", "#ea580c"),
+        ("Optimal Consensus Ensemble", "#059669"),
+        ("6-Caller Union", "#0284c7"),
+        ("6-Caller Union + CatBoost", "#15803d"),
+        ("DRAGEN", "#dc2626")
+    ]
+    n_series = len(strategies)
+    width = 0.075
+    offsets = np.linspace(-(n_series - 1) / 2 * width, (n_series - 1) / 2 * width, n_series)
+
+    for i, (strat_name, strat_color) in enumerate(strategies):
+        row = df1[df1["Calling_Strategy"] == strat_name]
+        if row.empty:
+            continue
+        vals = [row[m_col].iloc[0] for m_col in m_keys]
+        ax.bar(x + offsets[i], vals, width, label=strat_name, color=strat_color,
+               alpha=0.92, edgecolor='#1e293b', linewidth=0.6)
 
     ax.set_xticks(x)
-    ax.set_xticklabels(strategies, rotation=22, ha='right', fontweight='bold', fontsize=9.2)
-    ax.set_ylabel("Metric Value (0.0 – 1.0)", fontweight='bold', fontsize=11.5)
-    ax.set_ylim(-0.06, 1.15)
-    ax.axhline(0, color='#64748b', linewidth=0.9)
+    ax.set_xticklabels(m_labels, fontweight='bold', fontsize=12)
+    ax.set_ylabel("Diagnostic Performance Metric (0.0 to 1.0 Scale)", fontweight='bold', fontsize=12)
+    ax.set_ylim(-0.05, 1.15)
+    ax.set_yticks(np.arange(0.0, 1.15, 0.1))
+    ax.grid(axis='y', linestyle='--', alpha=0.4, color='#cbd5e1')
+    ax.axhline(0, color='#334155', linewidth=0.9)
 
-    ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1.04), ncol=6, frameon=True,
+    ax.legend(loc='lower center', bbox_to_anchor=(0.5, 1.03), ncol=5, frameon=True,
               facecolor='#ffffff', edgecolor='#cbd5e1', framealpha=0.98, fontsize=9.2)
-    fig.suptitle("Figure 1: Comparative Diagnostic Performance Across 10 Calling Strategies\n"
-                 "[Specification: Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger]",
+    fig.suptitle("Figure 1: Comparative Diagnostic Performance Across 10 Calling Strategies and 7 Metrics\n"
+                 "[Specification: Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger; DRAGEN on Control BED]",
                  fontsize=13.5, fontweight='bold', y=0.985)
 
     out_fig = os.path.join(figures_dir, "fig1_individual_callers_quality_metrics.png")
@@ -398,6 +421,9 @@ def parse_and_generate_table2_figure2(results_dir, tables_dir, figures_dir):
     # Harmonized target-aware evaluation space across 63 QC-passed probands:
     total_space = 63 * 80593
 
+    comb_k_map = {"k >= 1": 6, "k >= 2": 15, "k >= 3": 20, "k >= 4": 15, "k >= 5": 6, "k >= 6": 1, "k = 6": 1}
+    cum_comb_map = {"k >= 1": 63, "k >= 2": 57, "k >= 3": 42, "k >= 4": 22, "k >= 5": 7, "k >= 6": 1, "k = 6": 1}
+
     for line in sec.splitlines():
         if not line.strip().startswith("|") or "Support Tier" in line or ":---" in line:
             continue
@@ -408,14 +434,23 @@ def parse_and_generate_table2_figure2(results_dir, tables_dir, figures_dir):
         # Truncate to the 6 local open-source callers (exclude phantom k=7 tier)
         if "7" in tier_name or "k = 7" in tier_name or "k >= 7" in tier_name:
             continue
-        p_m = re.search(r"([\d\.]+)", parts[1])
-        s_m = re.search(r"([\d\.]+)", parts[2])
-        r_m = re.search(r"([\d\.]+)", parts[3])
+
+        if len(parts) >= 6:
+            p_m = re.search(r"([\d\.]+)", parts[3])
+            s_m = re.search(r"([\d\.]+)", parts[4])
+            r_m = re.search(r"([\d\.]+)", parts[5])
+            notes = re.sub(r"[\*\$\\]", "", parts[6]).strip() if len(parts) > 6 else ""
+        else:
+            p_m = re.search(r"([\d\.]+)", parts[1])
+            s_m = re.search(r"([\d\.]+)", parts[2])
+            r_m = re.search(r"([\d\.]+)", parts[3])
+            notes = re.sub(r"[\*\$\\]", "", parts[4]).strip() if len(parts) > 4 else ""
+
         if not (p_m and s_m and r_m):
             continue
-        p = float(p_m.group(1)) / 100.0
-        s = float(s_m.group(1)) / 100.0
-        r = float(r_m.group(1)) / 100.0
+        p = round(float(p_m.group(1)) / 100.0, 4)
+        s = round(float(s_m.group(1)) / 100.0, 4)
+        r = round(float(r_m.group(1)) / 100.0, 4)
 
         tp = int(round(s * 2283))
         fn = 2283 - tp
@@ -423,9 +458,14 @@ def parse_and_generate_table2_figure2(results_dir, tables_dir, figures_dir):
         tn = max(0, total_space - tp - fp - fn)
         c_metrics = compute_contingency_metrics(tp, fp, fn, tn)
 
-        notes = re.sub(r"[\*\$\\]", "", parts[4]).strip() if len(parts) > 4 else ""
+        base_tier = tier_name.split(" (")[0].strip()
+        c_k = comb_k_map.get(base_tier, 1)
+        cum_c = cum_comb_map.get(base_tier, 1)
+
         records.append({
             "Support_Tier": tier_name,
+            "Combinations_k": c_k,
+            "Cumulative_Combinations": cum_c,
             "Precision": p,
             "Recall": s,
             "Cumulative_Retention": r,
@@ -955,8 +995,8 @@ def sync_progress_report(report_path, df1, df2, df3, df4, df5):
 
     new_fig1_block = (
         "![Figure 1: Comparative Diagnostic Performance Across 10 Calling Strategies](figures/fig1_individual_callers_quality_metrics.png)\n"
-        "*Figure 1: Comparative Diagnostic Performance Across 10 Calling Strategies [Specification: Local Callers under Mosdepth BED + Max Sensitivity Filter Profile + "
-        "Truvari Merger; DRAGEN 4.4.6 as External Benchmark on Control BED] (0.0–1.0 Scale). Bars display validation metrics (Recall, Precision, Specificity, F2 Score, and MCC) evaluated across "
+        "*Figure 1: Comparative Diagnostic Performance Across 10 Calling Strategies and 7 Metrics [Specification: Local Callers under Mosdepth BED + Max Sensitivity Filter Profile + "
+        "Truvari Merger; DRAGEN 4.4.6 as External Benchmark on Control BED] (0.0–1.0 Scale). Grouped bar chart clustering by the 7 diagnostic performance metrics on the X-axis (Recall, Precision, F2 Score, MCC, Specificity, FPR, and FNR), with each cluster plotting 10 calling strategies/series evaluated across "
         "the 63 QC-passed DDD-UK probands. Individual callers exhibit complementary trade-offs: GATK-gCNV maximizes raw recall (0.9926), CANOES "
         "optimizes precision on focal events (0.4293), while the Optimal Consensus Ensemble (CANOES + ExomeDepth + CNVkit + GATK-gCNV) and "
         "CatBoost ML filter achieve peak clinical harmonic utility (0.947–0.949 F2, 0.925–0.926 MCC) on standard Linux HPC infrastructure.*"
@@ -967,8 +1007,8 @@ def sync_progress_report(report_path, df1, df2, df3, df4, df5):
     md_t2_rows = [
         "##### Table 2: Diagnostic Performance Across Caller Support Tiers (k = 1 → 6) (0.0–1.0 Scale)",
         "**Operational Specification**: Evaluated under **Mosdepth Consensus BED + Max Sensitivity Filter Profile + Truvari (Coordinate-Only) Merger** across caller concordance support tiers ($k = 1 \\to 6$) for the 6 local open-source callers.\n",
-        "| Support Tier ($k$) | Precision | Recall | Cumulative Retention | $F_2$ Score | Operational Interpretation |",
-        "| :---: | :---: | :---: | :---: | :---: | :--- |"
+        "| Support Tier ($k$) | Combinations ($\\binom{6}{k}$) | Cumulative Subsets | Precision | Recall | Cumulative Retention | $F_2$ Score | Operational Interpretation |",
+        "| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |"
     ]
     ge_sym = r"\ge"
     for _, r in df2.iterrows():
@@ -980,7 +1020,9 @@ def sync_progress_report(report_path, df1, df2, df3, df4, df5):
         else:
             k_fmt = st.replace(">=", ge_sym)
             formatted_tier = f"${k_fmt}$"
-        md_t2_rows.append(f"| **{formatted_tier}** | {r['Precision']:.4f} | {r['Recall']:.4f} | {r['Cumulative_Retention']*100:.1f}% | {r['F2_Score']:.4f} | {r['Operational_Interpretation']} |")
+        c_k = r['Combinations_k'] if 'Combinations_k' in r else '-'
+        cum_c = r['Cumulative_Combinations'] if 'Cumulative_Combinations' in r else '-'
+        md_t2_rows.append(f"| **{formatted_tier}** | {c_k} | {cum_c} | {r['Precision']:.4f} | {r['Recall']:.4f} | {r['Cumulative_Retention']*100:.1f}% | {r['F2_Score']:.4f} | {r['Operational_Interpretation']} |")
 
     table2_md = "\n".join(md_t2_rows)
     pattern2 = r"##### Table 2:.*?Performance Across Caller Support Tiers.*?(?=\n\n\*Note on Table 2:|\n\n!\[Figure 2)"
@@ -988,11 +1030,13 @@ def sync_progress_report(report_path, df1, df2, df3, df4, df5):
 
     new_note2 = (
         "*Note on Table 2: Metrics and cumulative retention are evaluated under Mosdepth Consensus BED + Max Sensitivity Filter Profile + "
-        "Truvari Merger across the cohort for the 6 local open-source callers. Precision increases strictly monotonically from 64.86% to 93.80% as caller support increases from "
+        "Truvari Merger across the cohort for the 6 local open-source callers. The 6 callers yield $2^6 - 1 = 63$ total non-empty subsets, partitioned "
+        "into $\\binom{6}{k}$ combinations per support tier. Precision increases strictly monotonically from 64.86% to 93.80% as caller support increases from "
         "$k \\ge 1$ to $k = 6$ (Page's $L = 3474.0, p = 2.13 \\times 10^{-32}$). Requiring $k \\ge 2$ callers provides the optimal operational threshold: "
         "it retains 78.4% of candidate variants, preserves 96.70% of validated truth variants (recall = 0.967), and eliminates >80% of "
         "single-caller technical artifacts. Enforcing higher voting thresholds ($k \\ge 3$ or higher) leads to progressive recall collapse, "
-        "culminating in 31.6% recall loss if unanimous agreement ($k = 6$) is demanded.*"
+        "culminating in 31.6% recall loss if unanimous agreement ($k = 6$) is demanded. In Figure 2B, False Positive Rate (FPR) remains $\\le 0.0002$ "
+        "due to the extensive denominator of $>5,075,000$ diploid target intervals across the 63 probands, aligning visually along the zero baseline.*"
     )
     content = re.sub(r"\*Note on Table 2:.*?(?=\n\n!\[Figure 2)", lambda _: new_note2, content, flags=re.DOTALL)
 
@@ -1001,7 +1045,8 @@ def sync_progress_report(report_path, df1, df2, df3, df4, df5):
         "*Figure 2: Caller Concordance Support Tiers Dynamics (k = 1 → 6) [Specification: Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger] "
         "(0.0–1.0 Scale). (A) Variant retention trajectory relative to the raw discovery union, showing retention declines from 100.0% down to 27.5%. "
         "(B) Concordance progression curve across 6 series demonstrating that precision strictly increases with caller voting stringency (0.649 to 0.938), "
-        "while recall drops (0.981 to 0.684), identifying $k \\ge 2$ as the peak clinical harmonic operating threshold.*"
+        "while recall drops (0.981 to 0.684), identifying $k \\ge 2$ as the peak clinical harmonic operating threshold. The False Positive Rate (FPR) line plots along "
+        "the baseline (y <= 0.0002) because unaffected diploid target intervals (>5,075,000) vastly exceed true CNV targets.*"
     )
     content = re.sub(r"!\[Figure 2:.*?\]\(figures/fig2_support_tiers_concordance_and_performance\.png\)\n\*Figure 2:.*?\*", lambda _: new_fig2_block, content, flags=re.DOTALL)
 

@@ -1,7 +1,7 @@
 Support_Tier	Combinations_k	Cumulative_Combinations	Precision	Recall	Cumulative_Retention	F2_Score	Specificity	MCC	False_Positive_Rate	False_Negative_Rate	Specification	Operational_Interpretation
-k >= 1 (Any Caller)	6	63	0.6486	0.9812	1.0000	0.8899	0.9998	0.7976	0.0002	0.0188	Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger	Baseline (Complete 6-Caller Discovery Union)
-k >= 2 (Optimal Tier)	15	57	0.8520	0.9670	0.7840	0.9417	0.9999	0.9076	0.0001	0.0329	Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger	Peak F_2 Harmonic Gain (15 pairwise caller intersections)
-k >= 3	20	42	0.8980	0.9130	0.6120	0.9098	1.0000	0.9053	0.0000	0.0872	Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger	Clinical Triaging Tier (20 triplet caller intersections)
-k >= 4	15	22	0.9240	0.8450	0.4780	0.8596	1.0000	0.8835	0.0000	0.1551	Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger	Confirmatory Diagnostic Tier (15 quadruplet intersections)
-k >= 5	6	7	0.9310	0.7620	0.3610	0.7908	1.0000	0.8423	0.0000	0.2378	Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger	High Specificity Tier (6 quintuplet intersections)
-k >= 6	1	1	0.9380	0.6840	0.2750	0.7233	1.0000	0.8011	0.0000	0.3158	Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger	Strict Consensus Tier (1 unanimous 6-caller intersection)
+k >= 1 (Any Caller)	6	63	0.6486	0.9812	1.0	0.8899	0.9998	0.7976	0.0002	0.0188	Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger	Baseline
+k >= 2 (Optimal)	15	57	0.852	0.967	0.784	0.9417	0.9999	0.9076	0.0001	0.0329	Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger	Peak F_2 Harmonic Gain (p = 0.0004)
+k >= 3	20	42	0.898	0.913	0.612	0.9098	1.0	0.9053	0.0	0.0872	Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger	Clinical Triaging Tier
+k >= 4	15	22	0.924	0.845	0.478	0.8596	1.0	0.8835	0.0	0.1551	Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger	Confirmatory Diagnostic Tier
+k >= 5	6	7	0.931	0.762	0.361	0.7908	1.0	0.8423	0.0	0.2378	Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger	High Specificity Tier
+k >= 6	1	1	0.938	0.684	0.275	0.7233	1.0	0.8011	0.0	0.3158	Mosdepth BED + Max Sensitivity Filter Profile + Truvari Merger	Strict Consensus Tier
