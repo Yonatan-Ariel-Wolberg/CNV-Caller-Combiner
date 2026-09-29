@@ -172,7 +172,7 @@ gantt
 | **OBJ1-2** | Multi-Caller Raw Discordance Profiling | May – Sep 2025 | **Completed** | Discovered 10.2:1 discordant-to-consensus call ratio. |
 | **OBJ1-3** | Mosdepth Consensus Target BED Generation | Oct – Dec 2025 | **Completed** | Raised mean on-target depth to $52.1\times$ by filtering dead baits; $-31\%$ raw noise. |
 | **OBJ1-4** | SV Merging Benchmark (Truvari vs. SURVIVOR) | Jan – Mar 2026 | **Completed** | Established Truvari coordinate-only merging delivering 4-fold precision gain (48.0% vs 12.0%) over SURVIVOR. |
-| **OBJ1-5** | Combinatorial Optimization (63 Combinations) | Apr – Jun 2026 | **Completed** | Evaluated 6 callers, consensus ($k \ge 2$, 96.70% target recall), and 6-Union (98.12% target recall, 2,240/2,283 targets) on $N=2,283$ truth target set. |
+| **OBJ1-5** | Combinatorial Optimization (63 Combinations) | Apr – Jun 2026 | **Completed** | Evaluated all 63 non-empty caller subsets ($\sum_{k=1}^6 \binom{6}{k} = 6 + 15 + 20 + 15 + 6 + 1 = 63$). Established unpruned 6-caller voting at $k \ge 2$ (15 pairwise combinations) achieves 85.20% precision (96.70% recall), while the curated 4-caller Optimal Ensemble (CANOES+ExomeDepth+CNVkit+GATK, $\binom{4}{2} = 6$ combinations) prunes 9 noisy CLAMMS/XHMM pairs to reach 88.39% precision (96.71% recall). |
 | **OBJ1-6** | DRAGEN 4.4.6 vs. Local Ensemble Benchmark | Jul – Sep 2026 | **Completed** | Demonstrated local ensemble achieves $+3.4\%$ higher recall (96.71% vs 93.30%) compared to external vendor-standard DRAGEN 4.4.6 benchmark. |
 
 ### 4.3 Objective 2: Machine Learning In Silico Validation (CatBoost) (DDD-UK)

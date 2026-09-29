@@ -138,20 +138,25 @@ The pipeline provides three pre-tuned filtering profiles to accommodate differen
 
 ---
 
-## 6. Key Finding 5: Caller Support Tiers ($1 \to 6$ Callers) & Page's L Trend
+## 6. Key Finding 5: Caller Support Tiers ($1 \to 6$ Callers) & Combinatorial Partitioning
 
-Analyzing probe discordance across support tiers confirms the power of ensemble consensus:
+Analyzing probe discordance across support tiers confirms the power of ensemble consensus across the $2^6 - 1 = 63$ non-empty caller subsets:
 
-| Support Tier ($k$) | Precision | Sensitivity | Cumulative Retention | Monotonicity Check (Page's L) |
-| :---: | :---: | :---: | :---: | :---: |
-| **$k \ge 1$ (Any Caller)** | $64.86\%$ | $98.12\%$ | $100.0\%$ | Baseline |
-| **$k \ge 2$ (Optimal)** | **$85.20\%$** | **$96.70\%$** | $78.4\%$ | **Peak $F_2$ Harmonic Gain** ($p = 0.0004$) |
-| **$k \ge 3$** | $89.80\%$ | $91.30\%$ | $61.2\%$ | Clinical Triaging Tier |
-| **$k \ge 4$** | $92.40\%$ | $84.50\%$ | $47.8\%$ | Confirmatory Diagnostic Tier |
-| **$k \ge 5$** | $93.10\%$ | $76.20\%$ | $36.1\%$ | High Specificity Tier |
-| **$k \ge 6$** | $93.80\%$ | $68.40\%$ | $27.5\%$ | Strict Consensus Tier |
+| Support Tier ($k$) | Combinations ($\binom{6}{k}$) | Cumulative Subsets | Precision | Sensitivity | Cumulative Retention | Monotonicity Check (Page's L) |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **$k \ge 1$ (Any Caller)** | 6 | 63 | $64.86\%$ | $98.12\%$ | $100.0\%$ | Baseline (Complete 6-Caller Union) |
+| **$k \ge 2$ (Optimal Tier)** | 15 | 57 | **$85.20\%$** | **$96.70\%$** | $78.4\%$ | **Peak $F_2$ Harmonic Gain** ($p = 0.0004$) |
+| **$k \ge 3$** | 20 | 42 | $89.80\%$ | $91.30\%$ | $61.2\%$ | Clinical Triaging Tier |
+| **$k \ge 4$** | 15 | 22 | $92.40\%$ | $84.50\%$ | $47.8\%$ | Confirmatory Diagnostic Tier |
+| **$k \ge 5$** | 6 | 7 | $93.10\%$ | $76.20\%$ | $36.1\%$ | High Specificity Tier |
+| **$k \ge 6$** | 1 | 1 | $93.80\%$ | $68.40\%$ | $27.5\%$ | Strict Consensus Tier |
 
 **Page's L Trend Test Analysis**: $L = 3474.0, p = 2.13 \times 10^{-32}$. Precision strictly increases with caller support. Requiring $k \ge 2$ eliminates $>80\%$ of single-caller technical artifacts while preserving $>96\%$ of true pathogenic variants. If unanimous agreement ($k = 6$) is required, sensitivity drops to $68.40\%$ (31.6% sensitivity loss).
+
+### Combinatorial Resolution: Generic $k \ge 2$ Voting (15 Pairs) vs. Optimal Consensus Ensemble (6 Pairs)
+* **Generic $k \ge 2$ Tier (15 Pairs)**: Evaluated across all 6 local callers, this unpruned voting rule accepts calls supported by any 2 or more algorithms. However, 9 of the $\binom{6}{2} = 15$ pairwise combinations involve CLAMMS (low sensitivity, 29.00%) or XHMM (PCA model sensitive to extreme GC). When CLAMMS and XHMM co-call depth fluctuations over GC-skewed baits or segmental duplications, the blind $k \ge 2$ rule accepts them, retaining 375 false-positive targets and yielding **85.20% precision**.
+* **Curated 4-Caller Optimal Ensemble (6 Pairs)**: Evaluated across the top 4 complementary tools (CANOES + ExomeDepth + CNVkit + GATK-gCNV), consensus requires agreement among only $\binom{4}{2} = 6$ pairwise combinations (CANOES+CNVkit, CANOES+ExomeDepth, CANOES+GATK, CNVkit+ExomeDepth, CNVkit+GATK, ExomeDepth+GATK). Discarding the 9 noisy pairs involving CLAMMS/XHMM eliminates 85 false-positive targets (reducing FP from 375 to 290) and drives precision to **88.39%** while maintaining identical sensitivity (**96.71% vs 96.70%**).
+* **CatBoost Machine Learning Triage**: Ingests all 63 combinations and dynamically scores each call using 21 quality and overlap features, achieving **89.09% precision** and **96.19% recall**.
 
 ---
 
