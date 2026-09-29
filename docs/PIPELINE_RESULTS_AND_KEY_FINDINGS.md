@@ -117,6 +117,10 @@ Truvari Merge:             |====================|           (Reciprocal overlap 
   * **SURVIVOR**: $86.0\%$ exact-breakpoint recovery (frequently merges adjacent distinct exon deletions in high-density gene clusters).
 * **Recommendation**: Truvari is the superior merging engine for exome consensus workflows.
 
+### Methodological Distinction: Variant-Level Merger Benchmarking vs. Probe-Level Caller Evaluation
+* **Variant-Level Evaluation for Merging Engines**: Merging engines (Truvari vs. SURVIVOR) do not process read depths or capture probe densities; their sole function is geometric coordinate reconciliation across callers. Fixed-window mergers like SURVIVOR merge adjacent calls within 1,000 bp across unsequenced introns, creating bloated contiguous intervals. On a probe level, this artificial expansion masks errors because the bloated interval covers the constituent probes. However, at the variant level, SURVIVOR creates false lumping, collapsing precision to 12.0% and generating 1,254 false-positive candidate intervals across the cohort (compared to 190 for Truvari). Merging engines are therefore benchmarked on exact breakpoint concordance and variant precision.
+* **Two-Tier Integration**: Once Truvari was established as superior at reconciling variant boundaries without window bloating, its consensus intervals were projected onto the $N = 2,283$ target probe intervals for all downstream caller comparisons, tier stratifications, and machine learning models.
+
 ---
 
 ## 5. Key Finding 4: Filter Profiles & Clinical Decision Boundaries
