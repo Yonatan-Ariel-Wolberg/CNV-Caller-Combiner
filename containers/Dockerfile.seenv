@@ -7,7 +7,7 @@
 #              pinned dependency versions, verified SHA-256 checksums, permissive workspace.
 # ==============================================================================
 
-FROM quay.io/condaforge/mambaforge:24.9.2-0
+FROM quay.io/condaforge/miniforge3:latest
 
 # Use bash with pipefail for robust build execution
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
@@ -63,7 +63,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt
     && cp *.json /opt/conda/envs/seenv/bin/ \
     && chmod 0755 /opt/conda/envs/seenv/bin/seenv /opt/conda/envs/seenv/bin/*.py \
     && cd / && rm -rf /opt/seenv \
-    && mamba remove -y -n seenv git \
+    && mamba remove -y -n seenv git curl \
     && mamba clean -afy \
     && rm -rf /root/.cache /tmp/* /var/tmp/* /opt/conda/pkgs/* \
     && groupadd -g 10001 appuser \

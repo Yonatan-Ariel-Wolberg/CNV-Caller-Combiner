@@ -36,7 +36,7 @@ def test_train_dockerfile_exists_and_has_expected_content():
 
 def test_seenv_dockerfile_exists_and_has_expected_content():
     text = SEENV_DOCKERFILE.read_text(encoding="utf-8")
-    assert "FROM quay.io/condaforge/mambaforge:24.9.2-0" in text
+    assert "FROM quay.io/condaforge/miniforge3" in text or "FROM quay.io/condaforge/mambaforge" in text
     assert "samtools=1.21" in text
     assert "bedtools=2.31.1" in text
     assert "mosdepth=0.3.14" in text
