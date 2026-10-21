@@ -35,7 +35,8 @@ LABEL org.opencontainers.image.title="seenv-visualizer" \
 
 # Install pinned dependencies using mamba, install SeeNV at pinned commit SHA,
 # verify binary checksums, purge caches, and create non-root user.
-RUN mamba create -y -n seenv -c conda-forge -c bioconda \
+RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    && mamba create -y -n seenv -c conda-forge -c bioconda \
       python=3.10.14 \
       samtools=1.21 \
       bedtools=2.31.1 \

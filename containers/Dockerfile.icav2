@@ -37,6 +37,7 @@ LABEL org.opencontainers.image.title="icav2-cli" \
 # extract binary to /usr/local/bin/icav2, set permissions, create non-root user,
 # and purge temporary files and caches to minimize image footprint.
 RUN apt-get update \
+    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
         curl \
         jq \
@@ -47,6 +48,7 @@ RUN apt-get update \
     && mv /tmp/linux-amd64/icav2 /usr/local/bin/icav2 \
     && chmod 0755 /usr/local/bin/icav2 \
     && rm -rf /tmp/ica.zip /tmp/linux-amd64 \
+    && apt-get purge -y --auto-remove unzip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && groupadd -g 10001 appuser \

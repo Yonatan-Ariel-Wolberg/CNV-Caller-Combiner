@@ -23,17 +23,14 @@ LABEL org.opencontainers.image.title="catboost-optuna-train" \
       org.opencontainers.image.source="https://github.com/Yonatan-Ariel-Wolberg/CNV-Caller-Combiner"
 
 # Install build dependencies, C libraries for pysam and catboost, and procps for Nextflow resource tracking
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
         build-essential \
         libz-dev \
         procps \
         ca-certificates \
         curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install ML and Data Science dependencies
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir \
+    && pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir \
         catboost==1.2.10 \
         optuna==5.0.0 \
         xgboost==2.1.4 \
@@ -43,12 +40,22 @@ RUN pip install --no-cache-dir --upgrade pip && \
         numpy>=1.26.0 \
         pysam>=0.22.0 \
         scipy>=1.13.0 \
-        matplotlib>=3.8.0
+        matplotlib>=3.8.0 \
+    && apt-get purge -y --auto-remove build-essential \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /root/.cache /tmp/* /var/tmp/*
 
-# Open workspace directory with permissive permissions for Singularity/Docker container mounting
-RUN mkdir -p /workspace && chmod 0777 /workspace
+# Add non-root user for execution security (CIS Docker Benchmark 4.1)
+RUN groupadd -g 10001 appuser \
+    && useradd -u 10001 -g 10001 -m -s /bin/bash appuser \
+    && mkdir -p /workspace \
+    && chown -R 10001:10001 /workspace \
+    && chmod 0777 /workspace
 
 WORKDIR /workspace
+
+# Switch to non-root user
+USER 10001:10001
 
 # Verify installation of all required modules
 RUN python3 -c "import catboost, optuna, xgboost, sklearn, imblearn, pandas, numpy, pysam, scipy, matplotlib; print('ML dependencies successfully verified!')"
