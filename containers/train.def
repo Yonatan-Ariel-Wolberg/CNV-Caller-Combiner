@@ -33,6 +33,7 @@ From: python:3.12-slim
         optuna==5.0.0 \
         xgboost==2.1.4 \
         scikit-learn==1.6.1 \
+        shap>=0.45.0 \
         imbalanced-learn>=0.12.0 \
         pandas>=2.2.0 \
         numpy>=1.26.0 \
@@ -44,7 +45,7 @@ From: python:3.12-slim
     chmod 0777 /workspace
 
 %test
-    python3 -c "import catboost, optuna, xgboost, sklearn, imblearn, pandas, numpy, pysam, scipy, matplotlib; print('CatBoost & Optuna ML environment verified!')"
+    python3 -c "import catboost, optuna, xgboost, sklearn, shap, imblearn, pandas, numpy, pysam, scipy, matplotlib; print('CatBoost & Optuna ML environment verified!')"
 
 %runscript
     exec python3 "$@"

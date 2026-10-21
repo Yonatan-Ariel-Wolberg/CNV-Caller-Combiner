@@ -35,6 +35,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
         optuna==5.0.0 \
         xgboost==2.1.4 \
         scikit-learn==1.6.1 \
+        shap>=0.45.0 \
         imbalanced-learn>=0.12.0 \
         pandas>=2.2.0 \
         numpy>=1.26.0 \
@@ -58,6 +59,6 @@ WORKDIR /workspace
 USER 10001:10001
 
 # Verify installation of all required modules
-RUN python3 -c "import catboost, optuna, xgboost, sklearn, imblearn, pandas, numpy, pysam, scipy, matplotlib; print('ML dependencies successfully verified!')"
+RUN python3 -c "import catboost, optuna, xgboost, sklearn, shap, imblearn, pandas, numpy, pysam, scipy, matplotlib; print('ML dependencies successfully verified!')"
 
 CMD ["python3", "-c", "import catboost, optuna; print('CatBoost & Optuna ML environment ready')"]

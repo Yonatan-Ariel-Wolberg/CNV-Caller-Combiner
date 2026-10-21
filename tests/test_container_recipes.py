@@ -27,6 +27,7 @@ def test_train_dockerfile_exists_and_has_expected_content():
     assert "FROM python:3.12-slim" in text or "FROM quay.io/condaforge/mambaforge" in text
     assert 'org.opencontainers.image.version="1.0.0"' in text
     assert "catboost" in text
+    assert "shap" in text
     assert "scikit-learn" in text
     assert "imbalanced-learn" in text
     assert "pandas" in text
