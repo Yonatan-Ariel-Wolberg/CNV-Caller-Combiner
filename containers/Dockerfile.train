@@ -22,15 +22,19 @@ LABEL org.opencontainers.image.title="catboost-optuna-train" \
       org.opencontainers.image.licenses="BSD-3-Clause" \
       org.opencontainers.image.source="https://github.com/Yonatan-Ariel-Wolberg/CNV-Caller-Combiner"
 
-# Install build dependencies, C libraries for pysam and catboost, and procps for Nextflow resource tracking
+# Install system runtime & build dependencies, upgrade OS packages to latest security patches
 RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
         build-essential \
         libz-dev \
         procps \
         ca-certificates \
-        curl \
-    && pip install --no-cache-dir --upgrade pip setuptools wheel \
+    && pip install --no-cache-dir --upgrade pip "setuptools>=70.0.0" wheel \
     && pip install --no-cache-dir \
+        "certifi>=2024.7.4" \
+        "urllib3>=2.2.2" \
+        "requests>=2.32.3" \
+        "jinja2>=3.1.5" \
+        "tornado>=6.4.2" \
         catboost==1.2.10 \
         optuna==5.0.0 \
         xgboost==2.1.4 \
@@ -42,7 +46,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
         pysam>=0.22.0 \
         scipy>=1.13.0 \
         matplotlib>=3.8.0 \
-    && apt-get purge -y --auto-remove build-essential \
+    && apt-get purge -y --auto-remove build-essential libz-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /root/.cache /tmp/* /var/tmp/*
 

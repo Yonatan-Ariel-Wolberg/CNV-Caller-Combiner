@@ -36,6 +36,7 @@ LABEL org.opencontainers.image.title="seenv-visualizer" \
 # Install pinned dependencies using mamba, install SeeNV at pinned commit SHA,
 # verify binary checksums, purge caches, and create non-root user.
 RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    && mamba update -n base --all -y \
     && mamba create -y -n seenv -c conda-forge -c bioconda \
       python=3.10.14 \
       samtools=1.21 \
@@ -62,6 +63,7 @@ RUN apt-get update && apt-get upgrade -y && apt-get clean && rm -rf /var/lib/apt
     && cp *.json /opt/conda/envs/seenv/bin/ \
     && chmod 0755 /opt/conda/envs/seenv/bin/seenv /opt/conda/envs/seenv/bin/*.py \
     && cd / && rm -rf /opt/seenv \
+    && mamba remove -y -n seenv git \
     && mamba clean -afy \
     && rm -rf /root/.cache /tmp/* /var/tmp/* /opt/conda/pkgs/* \
     && groupadd -g 10001 appuser \
