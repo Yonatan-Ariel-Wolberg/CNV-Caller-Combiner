@@ -236,8 +236,15 @@ workflow CANOES {
 
     MERGE_READ_COUNTS(merged_reads_ch)
 
+    MERGE_READ_COUNTS.out.chr_reads_cov
+        .multiMap { chr, reads, sample_list ->
+            reads_cov: tuple(chr, reads, sample_list)
+            sample_list: sample_list
+        }
+        .set { forked_reads }
+
     // Step 5: Join merged read-counts and GC content by chromosome, then run CANOES
-    canoes_input_ch = MERGE_READ_COUNTS.out.chr_reads_cov
+    canoes_input_ch = forked_reads.reads_cov
         .join(CALC_GC_CANOES.out.chr_gc_content, by: 0)
 
     RUN_CANOES(canoes_input_ch)
@@ -250,10 +257,7 @@ workflow CANOES {
     COMBINE_CANOES_CNVS(all_cnvs_ch)
 
     // Step 7: Reuse sample list from the first MERGE_READ_COUNTS output
-    sample_list_ch = MERGE_READ_COUNTS.out.chr_reads_cov
-        .ifEmpty { error "CANOES received no merged chromosome read-count outputs. Check chromosome inputs and BAM batches." }
-        .first()
-        .map { chr, reads, sample_list -> sample_list }
+    sample_list_ch = forked_reads.sample_list.first()
 
     CONVERT_CANOES_TO_VCF(
         COMBINE_CANOES_CNVS.out.all_cnvs,

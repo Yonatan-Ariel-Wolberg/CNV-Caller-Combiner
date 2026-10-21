@@ -25,10 +25,10 @@ bin/*.sif
 bin/*.tar*
 
 # Completed container images and archives
-*icav2-cli*
-*catboost-train*
-*train-xgboost*
-*seenv-visualizer*
+*icav2-cli*.tar*
+*catboost-train*.tar*
+*train-xgboost*.tar*
+*seenv-visualizer*.tar*
 icav2_cli*.sif
 catboost-train*.sif
 train-xgboost*.sif
@@ -63,10 +63,19 @@ test_data_*/
 # Ignore Nested Work
 .nested_*
 
-# Agent configurations and skills
+# Agent configurations, skills, instructions, and scratch directories
 .agents/
-
+.agent/
+skills/
+**/skills/
 scratch/
+scratch*/
+**/scratch/
+**/scratch*/
+SKILL.md
+SKILLS.md
+**/SKILL.md
+**/SKILLS.md
 
 # Large Datasets / Tarballs
 Annotations_Human_3.5.tar.gz

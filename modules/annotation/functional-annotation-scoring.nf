@@ -13,10 +13,11 @@ nextflow.enable.dsl=2
 // Designed to be simple, easy to read, maintain, and modify for all researchers.
 // =====================================================================================
 
-params.outdir       = './results'
-params.annotsv_dir  = "${projectDir}/annotsv_db"
-params.genome_build = 'GRCh38'
-params.min_score    = 0.0  // Set e.g. 40.0 to only keep Moderate & High priority calls
+params.outdir          = './results'
+params.annotsv_dir     = "${projectDir}/annotsv_db"
+params.genome_build    = 'GRCh38'
+params.min_score       = 0.0  // Set e.g. 40.0 to only keep Moderate & High priority calls
+params.strvctvre_tabix = null // Optional path to precomputed StrVCTVRE tabix file
 
 // =====================================================================================
 // PROCESS 1: ANNOTATE_FUNCTIONAL_ANNOTSV
@@ -59,13 +60,41 @@ process ANNOTATE_FUNCTIONAL_ANNOTSV {
 }
 
 // =====================================================================================
-// PROCESS 2: SCORE_FREQUENCY_AGNOSTIC
+// PROCESS 2: ANNOTATE_STRVCTVRE
+// =====================================================================================
+// Annotates candidate CNVs with StrVCTVRE deleteriousness scores (Sharo et al. 2021)
+// using precomputed tabix database or functional constraint fallback.
+process ANNOTATE_STRVCTVRE {
+    tag "${sample_id}"
+    label 'python'
+    publishDir "${params.outdir}/functional_scoring/2_strvctvre", mode: 'copy', overwrite: true
+
+    input:
+    tuple val(sample_id), path(annotated_tsv)
+
+    output:
+    tuple val(sample_id), path("${sample_id}.strvctvre.tsv"), emit: strvctvre_tsv
+
+    script:
+    def strvctvre_arg = params.strvctvre_tabix ? "--strvctvre-tabix \"${params.strvctvre_tabix}\"" : ""
+    """
+    python3 ${projectDir}/bin/annotate_strvctvre.py \\
+        --input "${annotated_tsv}" \\
+        --output "${sample_id}.strvctvre.tsv" \\
+        --genome-build "${params.genome_build}" \\
+        ${strvctvre_arg}
+    """
+}
+
+// =====================================================================================
+// PROCESS 3: SCORE_FREQUENCY_AGNOSTIC
 // =====================================================================================
 // Scores variants (0 to 100 points) based entirely on intrinsic biological constraints:
 //   - Gene Intolerance: High pLI (>= 0.90) or Low LOEUF (<= 0.35)
 //   - Dosage Sensitivity: ClinGen Haploinsufficiency (loss) / Triplosensitivity (gain)
 //   - Disease Relevance: OMIM Morbid Gene overlap
 //   - Coding Disruption: Exon / CDS disruption vs intronic
+//   - StrVCTVRE Deleteriousness: >= 0.58 pathogenic threshold / >= 0.80 high confidence
 //   - Algorithm Concordance: Multi-caller support (CANOES, CLAMMS, XHMM, etc.)
 //
 // Outputs:
@@ -75,7 +104,7 @@ process ANNOTATE_FUNCTIONAL_ANNOTSV {
 process SCORE_FREQUENCY_AGNOSTIC {
     tag "${sample_id}"
     label 'python'
-    publishDir "${params.outdir}/functional_scoring/2_prioritized", mode: 'copy', overwrite: true
+    publishDir "${params.outdir}/functional_scoring/3_prioritized", mode: 'copy', overwrite: true
 
     input:
     tuple val(sample_id), path(annotated_tsv)
@@ -103,10 +132,14 @@ workflow FUNCTIONAL_ANNOTATION_SCORING {
         // Step 1: Annotate with AnnotSV (genes, pLI, LOEUF, CDS, OMIM)
         ANNOTATE_FUNCTIONAL_ANNOTSV(vcf_ch)
 
-        // Step 2: Score using frequency-agnostic biological constraints
-        SCORE_FREQUENCY_AGNOSTIC(ANNOTATE_FUNCTIONAL_ANNOTSV.out.annotated_tsv)
+        // Step 2: Annotate with StrVCTVRE deleteriousness scores
+        ANNOTATE_STRVCTVRE(ANNOTATE_FUNCTIONAL_ANNOTSV.out.annotated_tsv)
+
+        // Step 3: Score using frequency-agnostic biological constraints & StrVCTVRE
+        SCORE_FREQUENCY_AGNOSTIC(ANNOTATE_STRVCTVRE.out.strvctvre_tsv)
 
     emit:
         annotated_tsv   = ANNOTATE_FUNCTIONAL_ANNOTSV.out.annotated_tsv
+        strvctvre_tsv   = ANNOTATE_STRVCTVRE.out.strvctvre_tsv
         prioritized_tsv = SCORE_FREQUENCY_AGNOSTIC.out.scored_tsv
 }
