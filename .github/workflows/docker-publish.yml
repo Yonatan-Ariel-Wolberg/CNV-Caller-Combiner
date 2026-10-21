@@ -35,13 +35,12 @@ jobs:
           # FORMAT: username/repository_name:specific_tag
           tags: |
             ywolberg/cnv-caller-combiner:icav2-cli-2.43.0
-            ywolberg/cnv-caller-combiner:icav2-cli
 
       - name: Scan icav2 image with Docker Scout
         uses: docker/scout-action@v1
         with:
           command: quickview,cves
-          image: ywolberg/cnv-caller-combiner:icav2-cli
+          image: ywolberg/cnv-caller-combiner:icav2-cli-2.43.0
           only-severities: critical,high
         continue-on-error: true
 
@@ -57,13 +56,12 @@ jobs:
           # FORMAT: username/repository_name:specific_tag
           tags: |
             ywolberg/cnv-caller-combiner:catboost-train-1.0.0
-            ywolberg/cnv-caller-combiner:catboost-train
 
       - name: Scan train image with Docker Scout
         uses: docker/scout-action@v1
         with:
           command: quickview,cves
-          image: ywolberg/cnv-caller-combiner:catboost-train
+          image: ywolberg/cnv-caller-combiner:catboost-train-1.0.0
           only-severities: critical,high
         continue-on-error: true
 
@@ -79,12 +77,11 @@ jobs:
           # FORMAT: username/repository_name:specific_tag
           tags: |
             ywolberg/cnv-caller-combiner:seenv-visualizer-1.0.0
-            ywolberg/cnv-caller-combiner:seenv-visualizer
 
       - name: Scan seenv image with Docker Scout
         uses: docker/scout-action@v1
         with:
           command: quickview,cves
-          image: ywolberg/cnv-caller-combiner:seenv-visualizer
+          image: ywolberg/cnv-caller-combiner:seenv-visualizer-1.0.0
           only-severities: critical,high
         continue-on-error: true
