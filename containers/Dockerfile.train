@@ -15,9 +15,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1
 
 # Metadata labels mapping to opencontainers specification
-LABEL org.opencontainers.image.title="catboost-optuna-train" \
+LABEL org.opencontainers.image.title="catboost-train" \
       org.opencontainers.image.description="ML model training, Bayesian tuning, and feature triage (CatBoost & Optuna) for germline CNV calling" \
       org.opencontainers.image.version="1.0.0" \
+      software.version="1.0.0" \
       org.opencontainers.image.authors="Yonatan Wolberg" \
       org.opencontainers.image.licenses="BSD-3-Clause" \
       org.opencontainers.image.source="https://github.com/Yonatan-Ariel-Wolberg/CNV-Caller-Combiner"
