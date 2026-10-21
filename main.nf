@@ -491,9 +491,12 @@ def validate_full_reference_assets_consistency() {
 
 def validate_icav2_runtime_assets() {
     if (is_param_set('icav2_container')) {
-        def container_file = require_readable_file(params.icav2_container, 'icav2_container')
-        if (!container_file.name.toLowerCase().endsWith('.sif')) {
-            fail_validation("Error: ICAv2 asset unreadable or invalid: --icav2_container must point to a .sif file (${params.icav2_container})")
+        def container_str = params.icav2_container.toString()
+        if (!container_str.startsWith('docker://') && !container_str.startsWith('shub://') && !container_str.startsWith('oras://')) {
+            def container_file = require_readable_file(params.icav2_container, 'icav2_container')
+            if (!container_file.name.toLowerCase().endsWith('.sif')) {
+                fail_validation("Error: ICAv2 asset unreadable or invalid: --icav2_container must point to a .sif file or remote container URI (${params.icav2_container})")
+            }
         }
     }
 
@@ -897,6 +900,669 @@ Options:
 // WORKFLOW SWITCH - FULLY INDEPENDENT EXECUTION BLOCKS
 // =====================================================================================
 
+workflow RUN_BENCHMARK_PIPELINE {
+            def caller_vcf_channels = []
+            def mergerMode = params.get('merger_mode', 'survivor')
+            def raw_vcfs_comp = Channel.empty()
+            def filtered_vcfs_comp = Channel.empty()
+            def normalised_vcfs_comp = Channel.empty()
+
+            def ch_samplesheet_bams = Channel.empty()
+            def ch_unsliced_bams = Channel.empty()
+            def ref_fa_common = file(params.get('ref', params.get('reference_fasta', params.get('fasta', ''))))
+            def ref_fai_common = file(params.get('fai', "${ref_fa_common}.fai"))
+
+            if (params.get('samplesheet_bams', false)) {
+                def ss_file = file(params.samplesheet_bams)
+                def first_row = ss_file.exists() ? ss_file.readLines().find { it.trim() && !it.startsWith('SampleID') } : null
+                if (first_row && (first_row.contains('.cram') || first_row.endsWith('.cram'))) {
+                    // CRAM paths supplied in samplesheet_bams: automatically convert on the fly!
+                    def ch_input_crams = Channel.fromPath(params.samplesheet_bams)
+                        .splitCsv(header: true, sep: '\t')
+                        .map { row -> [ "${row.SampleID}".replaceAll(/\.md$/, ''), file("${row.BAM}"), file("${row.BAM}.crai") ] }
+                    CONVERT_CRAM_TO_BAM_VERIFIED(ch_input_crams, ref_fa_common, ref_fai_common)
+                    ch_samplesheet_bams = CONVERT_CRAM_TO_BAM_VERIFIED.out.bam_and_index
+                    ch_unsliced_bams = CONVERT_CRAM_TO_BAM_VERIFIED.out.bam_and_index
+                } else {
+                    ch_samplesheet_bams = Channel.fromPath(params.samplesheet_bams)
+                        .splitCsv(header: true, sep: '\t')
+                        .map { row ->
+                            def sample_id = "${row.SampleID}".replaceAll(/\.md$/, '')
+                            def bam_file = file("${row.BAM}")
+                            def bai_path = row.BAI ?: (file("${row.BAM}.bai").exists() ? "${row.BAM}.bai" : "${row.BAM}".replaceAll(/\.bam$/, '.bai'))
+                            def bai_file = file(bai_path)
+                            [ sample_id, bam_file, bai_file ]
+                        }
+                    ch_unsliced_bams = ch_samplesheet_bams
+                }
+            } else if (params.get('samplesheet_crams', false)) {
+                // Automated CRAM-to-BAM on-the-fly conversion with 30 forensic verification gates
+                def ch_input_crams = Channel.fromPath(params.samplesheet_crams)
+                    .splitCsv(header: true, sep: '\t')
+                    .map { row -> [ "${row.SampleID}".replaceAll(/\.md$/, ''), file("${row.CRAM}"), file(row.CRAI ?: "${row.CRAM}.crai") ] }
+                def target_bed_for_slicing = params.get('target_bed', params.get('probes', params.get('exome_targets', params.get('targets', false))))
+                if (target_bed_for_slicing && !params.get('disable_target_slicing', false)) {
+                    CONVERT_CRAM_TO_TARGET_PADDED_BAM(ch_input_crams, ref_fa_common, ref_fai_common, file(target_bed_for_slicing))
+                    ch_samplesheet_bams = CONVERT_CRAM_TO_TARGET_PADDED_BAM.out.bam_and_index
+                    // For CNVkit, ensure unsliced alignment is provided so off-target (antitarget) depth calculations are preserved
+                    CONVERT_CRAM_TO_BAM_VERIFIED(ch_input_crams, ref_fa_common, ref_fai_common)
+                    ch_unsliced_bams = CONVERT_CRAM_TO_BAM_VERIFIED.out.bam_and_index
+                } else {
+                    CONVERT_CRAM_TO_BAM_VERIFIED(ch_input_crams, ref_fa_common, ref_fai_common)
+                    ch_samplesheet_bams = CONVERT_CRAM_TO_BAM_VERIFIED.out.bam_and_index
+                    ch_unsliced_bams = CONVERT_CRAM_TO_BAM_VERIFIED.out.bam_and_index
+                }
+            }
+
+            def should_run_canoes = is_caller_enabled('canoes', workflow_mode)
+            if (should_run_canoes && (params.get('fai', false) || params.get('ref', false) || params.get('fasta', false)) && (params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false))) {
+                def chroms = (1..22).toList().collect { 'chr' + "${it}" }
+                def canoes_bam_list = ch_samplesheet_bams.collectFile() { item -> [ 'canoes_bam_list_unsorted.txt', "${item[1]}" + '\n' ] }
+                CANOES(canoes_bam_list, file(params.get('fai', "${ref_fa_common}.fai")), Channel.fromList(chroms))
+                def canoes_raw = CANOES.out.sorted_vcf.flatten()
+                raw_vcfs_comp = raw_vcfs_comp.mix(canoes_raw.map { f -> ["CANOES_raw", f] })
+                if (!params.get('skip_quality_filtering', false)) {
+                    FILTER_CANOES_FULL(Channel.of('CANOES_full').combine(canoes_raw.collect()))
+                    def canoes_filtered = FILTER_CANOES_FULL.out.filtered_data.map { it[2] }.flatten()
+                    filtered_vcfs_comp = filtered_vcfs_comp.mix(canoes_filtered.map { f -> ["CANOES_filtered", f] })
+                    if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
+                        NORM_CANOES_FULL(canoes_filtered, 'CANOES', 'out_CANOES')
+                        caller_vcf_channels << NORM_CANOES_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
+                        normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_CANOES_FULL.out.normalised_vcf.map { f -> ["CANOES", f] })
+                    } else {
+                        caller_vcf_channels << canoes_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
+                        normalised_vcfs_comp = normalised_vcfs_comp.mix(canoes_filtered.map { f -> ["CANOES", f] })
+                    }
+                } else {
+                    caller_vcf_channels << canoes_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
+                    normalised_vcfs_comp = normalised_vcfs_comp.mix(canoes_raw.map { f -> ["CANOES", f] })
+                }
+            }
+
+            def should_run_clamms = is_caller_enabled('clamms', workflow_mode)
+            if (should_run_clamms && (params.get('fai', false) || params.get('ref', false) || params.get('fasta', false)) && (params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false))) {
+                def clamms_sample_list = ch_samplesheet_bams.map { it -> it[0] + '\n' }.collectFile(name: 'clamms_sample_list.txt')
+                CLAMMS(ch_samplesheet_bams, file(params.get('fai', "${ref_fa_common}.fai")), clamms_sample_list)
+                def clamms_raw = CLAMMS.out.sorted_vcf.flatten()
+                raw_vcfs_comp = raw_vcfs_comp.mix(clamms_raw.map { f -> ["CLAMMS_raw", f] })
+                if (!params.get('skip_quality_filtering', false)) {
+                    FILTER_CLAMMS_FULL(Channel.of('CLAMMS_full').combine(clamms_raw.collect()))
+                    def clamms_filtered = FILTER_CLAMMS_FULL.out.filtered_data.map { it[2] }.flatten()
+                    filtered_vcfs_comp = filtered_vcfs_comp.mix(clamms_filtered.map { f -> ["CLAMMS_filtered", f] })
+                    if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
+                        NORM_CLAMMS_FULL(clamms_filtered, 'CLAMMS', 'out_CLAMMS')
+                        caller_vcf_channels << NORM_CLAMMS_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
+                        normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_CLAMMS_FULL.out.normalised_vcf.map { f -> ["CLAMMS", f] })
+                    } else {
+                        caller_vcf_channels << clamms_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
+                        normalised_vcfs_comp = normalised_vcfs_comp.mix(clamms_filtered.map { f -> ["CLAMMS", f] })
+                    }
+                } else {
+                    caller_vcf_channels << clamms_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
+                    normalised_vcfs_comp = normalised_vcfs_comp.mix(clamms_raw.map { f -> ["CLAMMS", f] })
+                }
+            }
+
+            def should_run_xhmm = is_caller_enabled('xhmm', workflow_mode)
+            if (should_run_xhmm && (params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false))) {
+                XHMM(ch_samplesheet_bams)
+                def xhmm_raw = XHMM.out.sorted_vcf.flatten()
+                raw_vcfs_comp = raw_vcfs_comp.mix(xhmm_raw.map { f -> ["XHMM_raw", f] })
+                if (!params.get('skip_quality_filtering', false)) {
+                    FILTER_XHMM_FULL(Channel.of('XHMM_full').combine(xhmm_raw.collect()))
+                    def xhmm_filtered = FILTER_XHMM_FULL.out.filtered_data.map { it[2] }.flatten()
+                    filtered_vcfs_comp = filtered_vcfs_comp.mix(xhmm_filtered.map { f -> ["XHMM_filtered", f] })
+                    if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
+                        NORM_XHMM_FULL(xhmm_filtered, 'XHMM', 'out_XHMM')
+                        caller_vcf_channels << NORM_XHMM_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
+                        normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_XHMM_FULL.out.normalised_vcf.map { f -> ["XHMM", f] })
+                    } else {
+                        caller_vcf_channels << xhmm_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
+                        normalised_vcfs_comp = normalised_vcfs_comp.mix(xhmm_filtered.map { f -> ["XHMM", f] })
+                    }
+                } else {
+                    caller_vcf_channels << xhmm_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
+                    normalised_vcfs_comp = normalised_vcfs_comp.mix(xhmm_raw.map { f -> ["XHMM", f] })
+                }
+            }
+
+            def should_run_cnvkit = is_caller_enabled('cnvkit', workflow_mode)
+            def cnvkit_targets_path = params.get('targets', params.get('exome_targets', params.get('probes', params.get('probes_bed', ''))))
+            def cnvkit_fasta_path = params.get('fasta', params.get('ref', params.get('reference_fasta', '')))
+            def has_cnvkit_inputs = should_run_cnvkit && (params.get('bams', false) || params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false)) && cnvkit_fasta_path && cnvkit_targets_path && params.get('refflat', false)
+
+            if (has_cnvkit_inputs) {
+                def ch_bams_cnvkit_resolved
+                if (params.get('bams', false)) {
+                    def glob_pattern_full = params.bams.contains('{') ? params.bams : params.bams.replaceAll(/\.bam$/, '.{bam,bai,bam.bai}')
+                    ch_bams_cnvkit_resolved = Channel.fromPath(glob_pattern_full)
+                        .map { it -> 
+                            def sample_id = it.name.replaceAll(/\.bam\.bai$/, '').replaceAll(/\.bam$/, '').replaceAll(/\.bai$/, '').replaceAll(/\.md$/, '')
+                            [sample_id, it] 
+                        }
+                        .groupTuple(size: 2)
+                        .map { id, files -> [id, files.find { it.extension == 'bam' }, files.find { it.extension == 'bai' }] }
+                        .ifEmpty { error "full workflow CNVkit step received no BAMs. Check the --bams parameter value matches existing BAM files." }
+                } else {
+                    // CNVkit requires unsliced alignments so that antitarget (off-target) coverage is preserved
+                    ch_bams_cnvkit_resolved = ch_unsliced_bams
+                }
+                CNVKIT(
+                    ch_bams_cnvkit_resolved,
+                    file(cnvkit_fasta_path),
+                    file(cnvkit_targets_path),
+                    file(params.refflat),
+                    ch_bams_cnvkit_resolved.first().map { it[1] }
+                )
+                def cnvkit_raw = CNVKIT.out.sorted_vcf.flatten()
+                raw_vcfs_comp = raw_vcfs_comp.mix(cnvkit_raw.map { f -> ["CNVKIT_raw", f] })
+                if (!params.get('skip_quality_filtering', false)) {
+                    FILTER_CNVKIT_FULL(Channel.of('CNVKIT_full').combine(cnvkit_raw.collect()))
+                    def cnvkit_filtered = FILTER_CNVKIT_FULL.out.filtered_data.map { it[2] }.flatten()
+                    filtered_vcfs_comp = filtered_vcfs_comp.mix(cnvkit_filtered.map { f -> ["CNVKIT_filtered", f] })
+                    if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
+                        NORM_CNVKIT_FULL(cnvkit_filtered, 'CNVKIT', 'out_CNVKIT')
+                        caller_vcf_channels << NORM_CNVKIT_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
+                        normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_CNVKIT_FULL.out.normalised_vcf.map { f -> ["CNVKIT", f] })
+                    } else {
+                        caller_vcf_channels << cnvkit_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
+                        normalised_vcfs_comp = normalised_vcfs_comp.mix(cnvkit_filtered.map { f -> ["CNVKIT", f] })
+                    }
+                } else {
+                    caller_vcf_channels << cnvkit_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
+                    normalised_vcfs_comp = normalised_vcfs_comp.mix(cnvkit_raw.map { f -> ["CNVKIT", f] })
+                }
+            }
+
+            def should_run_gatk = is_caller_enabled('gatk', workflow_mode)
+            def gatk_targets_path = params.get('exome_targets', params.get('targets', params.get('probes', params.get('probes_bed', ''))))
+            def gatk_fasta_path = params.get('fasta', params.get('ref', params.get('reference_fasta', '')))
+            def gatk_fai_path = params.get('fai', "${gatk_fasta_path}.fai")
+            def has_gatk_inputs = should_run_gatk && !params.skip_gcnv_training && (params.get('samples_path', false) || params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false)) && gatk_fasta_path && gatk_fai_path && params.get('dict', false) && gatk_targets_path
+
+            if (has_gatk_inputs) {
+                def ch_bams_gcnv_resolved
+                if (params.get('samples_path', false)) {
+                    ch_bams_gcnv_resolved = Channel.fromPath(params.samples_path)
+                        .filter { it.name.endsWith('.bam') || it.name.endsWith('.cram') }
+                        .map { it ->
+                            def index_fallback = [file("${it}.bai"), file("${it}.bam.bai"), file(it.toString().replaceAll(/\.bam$/, '.bai'))]
+                                .find { f -> f.exists() }
+                            def index_file = index_fallback ? index_fallback : (it.name.endsWith('.bam') ? file("${it}.bai") : file("${it}.crai"))
+                            return [ it.baseName.replaceAll(/\.md$/, ''), it, index_file ]
+                        }
+                } else {
+                    ch_bams_gcnv_resolved = ch_samplesheet_bams
+                }
+                GATK_GCNV(
+                    ch_bams_gcnv_resolved,
+                    file(gatk_fasta_path),
+                    file(gatk_fai_path),
+                    file(params.dict),
+                    file(gatk_targets_path)
+                )
+                def gcnv_raw = GATK_GCNV.out.sorted_vcf.flatten()
+                raw_vcfs_comp = raw_vcfs_comp.mix(gcnv_raw.map { f -> ["GCNV_raw", f] })
+                if (!params.get('skip_quality_filtering', false)) {
+                    def gcnv_probes_path = params.probes_bed ?: params.probes ?: params.targets ?: gatk_targets_path
+                    def gcnv_probes = file(gcnv_probes_path)
+                    FILTER_GCNV_FULL(Channel.of('GCNV_full').combine(gcnv_raw.collect()), gcnv_probes)
+                    def gcnv_filtered = FILTER_GCNV_FULL.out.filtered_data.map { it[2] }.flatten()
+                    filtered_vcfs_comp = filtered_vcfs_comp.mix(gcnv_filtered.map { f -> ["GCNV_filtered", f] })
+                    if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
+                        NORM_GCNV_FULL(gcnv_filtered, 'GATK', 'out_GCNV')
+                        caller_vcf_channels << NORM_GCNV_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
+                        normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_GCNV_FULL.out.normalised_vcf.map { f -> ["GCNV", f] })
+                    } else {
+                        caller_vcf_channels << gcnv_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
+                        normalised_vcfs_comp = normalised_vcfs_comp.mix(gcnv_filtered.map { f -> ["GCNV", f] })
+                    }
+                } else {
+                    caller_vcf_channels << gcnv_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
+                    normalised_vcfs_comp = normalised_vcfs_comp.mix(gcnv_raw.map { f -> ["GCNV", f] })
+                }
+            }
+
+            def should_run_dragen = is_caller_enabled('dragen', workflow_mode)
+            if (should_run_dragen && workflow_mode != 'local') {
+                if (params.get('cramFilePairsUploadPath', false)) {
+                    Channel.fromPath(params.cramFilePairsUploadPath, checkIfExists: true)
+                        .filter { f -> f.name.endsWith('.cram') || f.name.endsWith('.bam') }
+                        .map { primary ->
+                            def sampleId = primary.name.replaceAll(/\.(cram|bam)$/, '').replaceAll(/\.md$/, '')
+                            def idxCandidates = primary.name.endsWith('.cram')
+                                ? [file("${primary}.crai"), file(primary.toString().replaceAll(/\.cram$/, '.crai'))]
+                                : [file("${primary}.bai"), file("${primary}.bam.bai"), file(primary.toString().replaceAll(/\.bam$/, '.bai'))]
+                            def indexFile = idxCandidates.find { it.exists() }
+                            [sampleId, [primary, indexFile]]
+                        }
+                        .filter { sampleId, pair -> pair[1] != null }
+                        .ifEmpty { error "full workflow (DRAGEN path): no CRAM or BAM file pairs found in '${params.cramFilePairsUploadPath}'. Check that the path contains indexed CRAM/BAM files." }
+                        .set { ch_cramPairs_full_dragen }
+                    DRAGEN(ch_cramPairs_full_dragen)
+                    def dragen_raw = DRAGEN.out.sorted_vcf.flatten()
+                    raw_vcfs_comp = raw_vcfs_comp.mix(dragen_raw.map { f -> ["DRAGEN_raw", f] })
+                    if (!params.get('skip_quality_filtering', false)) {
+                        FILTER_DRAGEN_FULL(Channel.of('DRAGEN_full').combine(dragen_raw.collect()))
+                        def dragen_filtered = FILTER_DRAGEN_FULL.out.filtered_data.map { it[2] }.flatten()
+                        filtered_vcfs_comp = filtered_vcfs_comp.mix(dragen_filtered.map { f -> ["DRAGEN_filtered", f] })
+                        if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
+                            NORM_DRAGEN_FULL(dragen_filtered, 'DRAGEN', 'out_DRAGEN')
+                            caller_vcf_channels << NORM_DRAGEN_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
+                            normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_DRAGEN_FULL.out.normalised_vcf.map { f -> ["DRAGEN", f] })
+                        } else {
+                            caller_vcf_channels << dragen_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
+                            normalised_vcfs_comp = normalised_vcfs_comp.mix(dragen_filtered.map { f -> ["DRAGEN", f] })
+                        }
+                    } else {
+                        caller_vcf_channels << dragen_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
+                        normalised_vcfs_comp = normalised_vcfs_comp.mix(dragen_raw.map { f -> ["DRAGEN", f] })
+                    }
+                }
+            }
+
+            def should_run_exomedepth = is_caller_enabled('exomedepth', workflow_mode)
+            def exomedepth_probes_path = params.get('probes', params.get('targets', params.get('exome_targets', params.get('probes_bed', ''))))
+
+            if (should_run_exomedepth && (params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false)) && exomedepth_probes_path) {
+                def exomedepth_probes = file(exomedepth_probes_path)
+                def exomedepth_bam_list = ch_samplesheet_bams.collectFile() { item -> [ 'exomedepth_bam_list.txt', "${item[1]}" + '\n' ] }
+                EXOMEDEPTH(exomedepth_bam_list, exomedepth_probes, file(params.get('fai', "${ref_fa_common}.fai")))
+                def exomedepth_raw = EXOMEDEPTH.out.sorted_vcf.flatten()
+                raw_vcfs_comp = raw_vcfs_comp.mix(exomedepth_raw.map { f -> ["EXOMEDEPTH_raw", f] })
+                if (!params.get('skip_quality_filtering', false)) {
+                    FILTER_EXOMEDEPTH_FULL(Channel.of('EXOMEDEPTH_full').combine(exomedepth_raw.collect()))
+                    def exomedepth_filtered = FILTER_EXOMEDEPTH_FULL.out.filtered_data.map { it[2] }.flatten()
+                    filtered_vcfs_comp = filtered_vcfs_comp.mix(exomedepth_filtered.map { f -> ["EXOMEDEPTH_filtered", f] })
+                    if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
+                        NORM_EXOMEDEPTH_FULL(exomedepth_filtered, 'EXOMEDEPTH', 'out_EXOMEDEPTH')
+                        caller_vcf_channels << NORM_EXOMEDEPTH_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
+                        normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_EXOMEDEPTH_FULL.out.normalised_vcf.map { f -> ["EXOMEDEPTH", f] })
+                    } else {
+                        caller_vcf_channels << exomedepth_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
+                        normalised_vcfs_comp = normalised_vcfs_comp.mix(exomedepth_filtered.map { f -> ["EXOMEDEPTH", f] })
+                    }
+                } else {
+                    caller_vcf_channels << exomedepth_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
+                    normalised_vcfs_comp = normalised_vcfs_comp.mix(exomedepth_raw.map { f -> ["EXOMEDEPTH", f] })
+                }
+            }
+
+
+
+            if (caller_vcf_channels.size() < 1) {
+                if (workflow_mode == 'dragen' || params.get('cramFilePairsUploadPath', false) || params.get('dragen_sv_dir', false)) {
+                    log.info "DRAGEN execution active without CNV caller output or 0 CNV callers configured. Bypassing consensus merging and evaluation."
+                } else {
+                    exit 1, "Error: workflow requires at least one CNV caller input. Please configure parameters for at least 1 caller."
+                }
+            }
+
+            def is_pathway_b = !(params.get('ml_pathway', 'B') ?: 'B').toString().trim().equalsIgnoreCase('A')
+            def ch_intrasample_merged = Channel.empty()
+            def ch_intrasample_tbi = Channel.empty()
+            def ch_refined_intrasample = Channel.empty()
+            def ch_annotated_vcf = Channel.empty()
+            def ch_acmg_vcfs = Channel.empty()
+
+            if (caller_vcf_channels.size() >= 1) {
+                def ch_vcfs = caller_vcf_channels[0]
+                caller_vcf_channels.drop(1).each { ch_part ->
+                    ch_vcfs = ch_vcfs.mix(ch_part)
+                }
+
+                grouped_vcfs = group_caller_vcfs(ch_vcfs)
+
+                def bam_f       = params.get('bam_file',         false) ? file(params.bam_file)         : []
+                def fasta_f     = params.get('reference_fasta',  false) ? file(params.reference_fasta)  : []
+                def bed_f       = params.get('bed_file',         false) ? file(params.bed_file)         : []
+                def map_f       = params.get('mappability_file', false) ? file(params.mappability_file) : []
+
+                // -----------------------------------------------------------------------------
+                // CALLER-INDEPENDENT TARGET COVERAGE & LOG2 CALCULATION
+                // -----------------------------------------------------------------------------
+                def ch_coverage_cnn = Channel.empty()
+                def ch_cov_targets = bed_f ?: (params.get('probes_bed', params.get('probes', params.get('target_bed', false))) ? file(params.get('probes_bed', params.get('probes', params.get('target_bed')))) : [])
+
+                if (params.get('run_cnvkit', false)) {
+                    ch_coverage_cnn = CNVKIT.out.target_cov
+                } else if ((params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false)) && ch_cov_targets && file(ch_cov_targets.toString()).exists()) {
+                    COMPUTE_TARGET_COVERAGE(ch_samplesheet_bams, ch_cov_targets)
+                    ch_coverage_cnn = COMPUTE_TARGET_COVERAGE.out.coverage_cnn
+                }
+
+                // -----------------------------------------------------------------------------
+                // STAGE 5: INTRA-SAMPLE, INTER-TOOL MERGING (SURVIVOR or Truvari)
+                // -----------------------------------------------------------------------------
+                ch_intrasample_merged = Channel.empty()
+                ch_intrasample_tbi = Channel.empty()
+                if (mergerMode == 'truvari') {
+                    TRUVARI(grouped_vcfs)
+                    ch_intrasample_merged = TRUVARI.out.merged_vcf
+                    ch_intrasample_tbi = TRUVARI.out.merged_tbi
+                    feature_inputs_ch = TRUVARI.out.merged_vcf
+                        .join(TRUVARI.out.collapsed_vcf)
+                        .join(grouped_vcfs)
+                        .join(ch_coverage_cnn, remainder: true)
+                        .filter { item ->
+                            item.size() >= 4 && item[1] != null && item[1] != []
+                        }
+                        .map { item ->
+                            def sample_id     = item[0]
+                            def merged_vcf    = item[1]
+                            def collapsed_vcf = item[2]
+                            def vcfs          = item[3]
+                            def cov_file      = (item.size() > 4 && item[4] != null) ? item[4] : []
+                            [sample_id, merged_vcf, collapsed_vcf, build_tool_vcfs_str(vcfs), 'truvari',
+                             bam_f, fasta_f, bed_f, map_f, cov_file]
+                        }
+                } else {
+                    SURVIVOR(grouped_vcfs)
+                    ch_intrasample_merged = SURVIVOR.out.union_vcf
+                    ch_intrasample_tbi = SURVIVOR.out.union_tbi
+                    feature_inputs_ch = SURVIVOR.out.union_vcf
+                        .join(grouped_vcfs)
+                        .join(ch_coverage_cnn, remainder: true)
+                        .filter { item ->
+                            item.size() >= 3 && item[1] != null && item[1] != []
+                        }
+                        .map { item ->
+                            def sample_id  = item[0]
+                            def merged_vcf = item[1]
+                            def vcfs       = item[2]
+                            def cov_file   = (item.size() > 3 && item[3] != null) ? item[3] : []
+                            [sample_id, merged_vcf, [], build_tool_vcfs_str(vcfs), 'survivor',
+                             bam_f, fasta_f, bed_f, map_f, cov_file]
+                        }
+                }
+
+                // Optional SV Calling via SvABA if BAMs and target BED provided, or ingestion of DRAGEN SV calls
+                def ch_sv_vcfs = Channel.empty()
+                if (params.get('run_svaba', false) && (params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false)) && params.get('fasta', false)) {
+                    SVABA(ch_samplesheet_bams, file(params.fasta), file(params.fai), file(params.get('exome_targets', params.get('probes_bed', ''))))
+                    ch_sv_vcfs = SVABA.out.sv_vcf
+                } else if (params.get('dragen_sv_dir', false)) {
+                    def dragen_sv_raw = Channel.fromPath("${params.dragen_sv_dir}/*.sv.vcf*")
+                        .filter { !it.name.endsWith('.tbi') && !it.name.endsWith('.csi') }
+                    BGZIP_SORT_INDEX_SV_VCF(dragen_sv_raw, 'DRAGEN', 'out_DRAGEN/sv_vcfs')
+                    ch_sv_vcfs = BGZIP_SORT_INDEX_SV_VCF.out.sv_vcf_tuple
+                }
+
+                // -----------------------------------------------------------------------------
+                // STAGE 6: POST-CONSENSUS BREAKPOINT REFINEMENT
+                // -----------------------------------------------------------------------------
+                ch_refined_intrasample = ch_intrasample_merged
+                if (params.get('run_refinement', true) && (params.get('run_svaba', false) || params.get('dragen_sv_dir', false))) {
+                    def ch_to_refine = ch_intrasample_merged.join(ch_intrasample_tbi).map { id, vcf, tbi -> [id, vcf, tbi] }
+                    REFINE_CONSENSUS_BREAKPOINTS(ch_to_refine.join(ch_sv_vcfs))
+                    ch_refined_intrasample = REFINE_CONSENSUS_BREAKPOINTS.out.refined_vcf.map { id, vcf, tbi -> [id, vcf] }
+                }
+
+                // -----------------------------------------------------------------------------
+                // OPTIONAL STAGE: HEADLESS IGV HTML VIEWER GENERATION
+                // -----------------------------------------------------------------------------
+                if (params.get('generate_igv_reports', false) || params.get('run_igv', false)) {
+                    def ch_igv_bams = ch_samplesheet_bams.map { id, bam, bai -> [id, bam, bai] }
+                    def ch_igv_inputs = ch_refined_intrasample.join(ch_igv_bams).map { id, vcf, bam, bai -> [id, vcf, bam, bai] }
+                    GENERATE_IGV_REPORT(ch_igv_inputs, ref_fa_common, ref_fai_common)
+                }
+
+                // -----------------------------------------------------------------------------
+                // STAGE 7: INTER-SAMPLE COHORT MERGING (SURVIVOR / Truvari)
+                // -----------------------------------------------------------------------------
+                def ch_cohort_merged = Channel.empty()
+                if (!params.get('skip_cohort_merge', false)) {
+                    MERGE_CONSENSUS_COHORT(ch_refined_intrasample.map { it[1] }.collect())
+                    ch_cohort_merged = Channel.of('full_cohort').combine(MERGE_CONSENSUS_COHORT.out.merged_vcf)
+                }
+
+                FEATURE_EXTRACTION(feature_inputs_ch)
+
+                if (!params.get('skip_cohort_merge', false)) {
+                    def ch_ref_fasta_db = params.get('fasta', params.get('reference_fasta', false)) ? file(params.get('fasta', params.get('reference_fasta'))) : file("${projectDir}/NO_FASTA")
+                    def ch_target_bed_db = params.get('probes_bed', params.get('target_bed', false)) ? file(params.get('probes_bed', params.get('target_bed'))) : file("${projectDir}/NO_BED")
+                    BUILD_COHORT_FEATURE_DATABASE(
+                        ch_cohort_merged,
+                        FEATURE_EXTRACTION.out.features_tsv.map { it[1] }.collect(),
+                        ch_ref_fasta_db,
+                        ch_target_bed_db
+                    )
+                }
+
+                is_pathway_b = !(params.get('ml_pathway', 'B') ?: 'B').toString().trim().equalsIgnoreCase('A')
+                def ch_af_filtered = Channel.empty()
+                def ch_catboost_predicted = Channel.empty()
+
+                if (!is_pathway_b) {
+                    // -------------------------------------------------------------------------
+                    // PATHWAY A (Default): AF Filtering -> CatBoost In Silico Prediction
+                    // -------------------------------------------------------------------------
+                    if (!params.get('skip_cohort_merge', false) && !params.get('skip_af_filtering', false)) {
+                        bcftoolsFlattenCohort(ch_cohort_merged)
+                        filterRareCnvs(bcftoolsFlattenCohort.out.cohort_tsv)
+                        def slice_joined = ch_cohort_merged.join(filterRareCnvs.out.rare_data)
+                        filterVcfByRareRegions(slice_joined.map { [ it[0], it[1], it[3] ] })
+                        ch_af_filtered = filterVcfByRareRegions.out.rare_vcf
+                    }
+
+                    if (params.skip_ml_training) {
+                        log.info "Skipping machine learning classifier training as requested (skip_ml_training = true)."
+                    } else {
+                        Channel.value(file(params.truth_labels))
+                            .set { ch_truth_full }
+                        def probesBedParamFull = params.get('probes_bed', false)
+                        Channel.value(probesBedParamFull ? file(probesBedParamFull) : [])
+                            .set { ch_probes_full }
+
+                        // Run CatBoost In Silico Prediction on AF-filtered VCF (or cohort merged if AF skipped)
+                        def vcfs_for_ml = (!params.get('skip_cohort_merge', false) && !params.get('skip_af_filtering', false)) ?
+                            ch_af_filtered.map { it[1] }.collect() :
+                            ch_cohort_merged.map { it[1] }.collect()
+
+                        RUN_CATBOOST_PREDICT(
+                            FEATURE_EXTRACTION.out.features_tsv.map { it[1] }.collect(),
+                            vcfs_for_ml,
+                            ch_truth_full,
+                            ch_probes_full
+                        )
+                        ch_catboost_predicted = RUN_CATBOOST_PREDICT.out.predicted_vcfs
+                    }
+                } else {
+                    // -------------------------------------------------------------------------
+                    // PATHWAY B: CatBoost In Silico Prediction -> AF Filtering
+                    // -------------------------------------------------------------------------
+                    if (params.skip_ml_training) {
+                        log.info "Skipping machine learning classifier training as requested (skip_ml_training = true)."
+                    } else {
+                        Channel.value(file(params.truth_labels))
+                            .set { ch_truth_full }
+                        def probesBedParamFull = params.get('probes_bed', false)
+                        Channel.value(probesBedParamFull ? file(probesBedParamFull) : [])
+                            .set { ch_probes_full }
+
+                        // Run CatBoost In Silico Prediction directly on cohort merged VCF
+                        def cohort_vcfs_for_ml = ch_cohort_merged.map { it[1] }.collect()
+                        RUN_CATBOOST_PREDICT(
+                            FEATURE_EXTRACTION.out.features_tsv.map { it[1] }.collect(),
+                            cohort_vcfs_for_ml,
+                            ch_truth_full,
+                            ch_probes_full
+                        )
+                        ch_catboost_predicted = RUN_CATBOOST_PREDICT.out.predicted_vcfs
+                    }
+
+                    if (!params.get('skip_cohort_merge', false) && !params.get('skip_af_filtering', false)) {
+                        def vcf_to_filter = (!params.skip_ml_training && params.get('truth_labels', false)) ?
+                            RUN_CATBOOST_PREDICT.out.predicted_vcfs.flatten().filter { f -> !f.name.endsWith('.tbi') && !f.name.endsWith('.csi') }.map { f -> ['full_cohort', f] } :
+                            ch_cohort_merged
+                        bcftoolsFlattenCohort(vcf_to_filter)
+                        filterRareCnvs(bcftoolsFlattenCohort.out.cohort_tsv)
+                        def slice_joined = vcf_to_filter.join(filterRareCnvs.out.rare_data)
+                        filterVcfByRareRegions(slice_joined.map { [ it[0], it[1], it[3] ] })
+                        ch_af_filtered = filterVcfByRareRegions.out.rare_vcf
+                    }
+                }
+
+                // -----------------------------------------------------------------------------
+                // STAGE 12 & 13: ANNOTSV VARIANT ANNOTATION & ACMG STRATIFICATION
+                // -----------------------------------------------------------------------------
+                ch_annotated_vcf = Channel.empty()
+                ch_acmg_vcfs = Channel.empty()
+                if (!params.get('skip_annotation', false) && params.get('annotsv_db', false)) {
+                    def annotsv_db_path = file(params.annotsv_db)
+                    def vcf_for_annotsv = is_pathway_b ?
+                        ((!params.get('skip_cohort_merge', false) && !params.get('skip_af_filtering', false)) ?
+                            ch_af_filtered :
+                            ((!params.skip_ml_training && params.get('truth_labels', false)) ?
+                                RUN_CATBOOST_PREDICT.out.predicted_vcfs.flatten().filter { f -> !f.name.endsWith('.tbi') && !f.name.endsWith('.csi') }.map { f -> ['full_cohort', f] } :
+                                ch_cohort_merged)) :
+                        ((!params.skip_ml_training && params.get('truth_labels', false)) ?
+                            RUN_CATBOOST_PREDICT.out.predicted_vcfs.flatten().filter { f -> !f.name.endsWith('.tbi') && !f.name.endsWith('.csi') }.map { f -> ['full_cohort', f] } :
+                            ((!params.get('skip_cohort_merge', false) && !params.get('skip_af_filtering', false)) ?
+                                ch_af_filtered :
+                                ch_cohort_merged))
+                    runAnnotSV(vcf_for_annotsv, annotsv_db_path)
+                    if (!params.get('skip_af_filtering', false)) {
+                        def acmg_joined = filterRareCnvs.out.rare_data.join(runAnnotSV.out.annotated_tsv)
+                        addACMGAnnotations(acmg_joined.map { [ it[0], it[1], it[3] ] })
+                        def vcf_acmg_joined = vcf_for_annotsv.join(runAnnotSV.out.annotated_tsv)
+                        stratifyVcfByAcmg(vcf_acmg_joined)
+                        ch_annotated_vcf = stratifyVcfByAcmg.out.annotated_vcf
+                        ch_acmg_vcfs = stratifyVcfByAcmg.out.acmg_vcfs
+
+                        // Quality assessment
+                        def resolved_eval_probes = file(params.probes_bed ?: params.probes ?: params.targets)
+                        def metrics_inputs = addACMGAnnotations.out.rare_cnvs_annotated
+                            .join(runAnnotSV.out.annotated_tsv)
+                            .combine(ch_refined_intrasample.map { it[1] }.collect().map { [ it ] })
+                            .map { run_id, rare_csv, annot_tsv, vcfs ->
+                                [ run_id, rare_csv, annot_tsv, vcfs ]
+                            }
+                        ANALYZE_CNV_QUALITY_METRICS(
+                            metrics_inputs,
+                            resolved_eval_probes
+                        )
+
+                        // ACMG Evaluators
+                        if (params.get('map_file', false) && params.get('truth_bed', false)) {
+                            def eval_inputs = addACMGAnnotations.out.score_separated_csvs.transpose()
+                            def eval_joined = eval_inputs.combine(Channel.of(resolved_eval_probes))
+                            EVALUATE_ACMG_CSV(
+                                eval_joined.map { [ it[0], it[1], it[2] ] },
+                                file(params.map_file),
+                                file(params.truth_bed)
+                            )
+                            PLOT_EVALUATION_METRICS(EVALUATE_ACMG_CSV.out.report.collect())
+                        }
+                    }
+                }
+            }
+
+            // -----------------------------------------------------------------------------
+            // MULTI-STAGE EVALUATION & QUALITY ASSESSMENT ACROSS ALL 10 CALLSETS
+            // -----------------------------------------------------------------------------
+            def qc_str = params.get('run_qc', false) ? "QC" : "NoQC"
+            def is_mosdepth = params.get('probes_bed', '').contains('mosdepth') || params.get('standard_bed', '').contains('mosdepth')
+            def bed_str = is_mosdepth ? "Mosdepth" : "Control"
+            def merger_str = mergerMode.toUpperCase()
+            def label_suffix = "_${bed_str}_${qc_str}_${merger_str}"
+
+            def all_evals = Channel.empty()
+            def all_quality_evals = Channel.empty()
+
+            // Stage 1: Raw CNV Callset
+            all_evals = all_evals.mix(raw_vcfs_comp.map { label, f -> ["1_raw_${label}${label_suffix}", f] })
+            all_quality_evals = all_quality_evals.mix(raw_vcfs_comp.map { label, f -> ["1_raw_${label}", f] })
+
+            // Stage 2: Quality-Filtered CNV Callset
+            all_evals = all_evals.mix(filtered_vcfs_comp.map { label, f -> ["2_quality_filtered_${label}${label_suffix}", f] })
+            all_quality_evals = all_quality_evals.mix(filtered_vcfs_comp.map { label, f -> ["2_quality_filtered_${label}", f] })
+
+            // Stage 3: Normalised CNV Callset
+            all_evals = all_evals.mix(normalised_vcfs_comp.map { label, f -> ["3_normalised_${label}${label_suffix}", f] })
+            all_quality_evals = all_quality_evals.mix(normalised_vcfs_comp.map { label, f -> ["3_normalised_${label}", f] })
+
+            if (caller_vcf_channels.size() >= 1) {
+                // Stage 4: Intra-Sample Inter-Tool Merged CNV Callset
+                all_evals = all_evals.mix(ch_intrasample_merged.map { sample_id, f -> ["4_merged_intrasample${label_suffix}", f] })
+                all_quality_evals = all_quality_evals.mix(ch_intrasample_merged.map { sample_id, f -> ["4_merged_intrasample", f] })
+
+                // Stage 5: Refined-Breakpoint CNV Callset
+                if (params.get('run_refinement', true) && (params.get('run_svaba', false) || params.get('dragen_sv_dir', false))) {
+                    all_evals = all_evals.mix(ch_refined_intrasample.map { sample_id, f -> ["5_refined_intrasample${label_suffix}", f] })
+                    all_quality_evals = all_quality_evals.mix(ch_refined_intrasample.map { sample_id, f -> ["5_refined_intrasample", f] })
+                }
+
+                // Stage 6: Inter-Sample Cohort Merged CNV Callset
+                if (!params.get('skip_cohort_merge', false)) {
+                    all_evals = all_evals.mix(MERGE_CONSENSUS_COHORT.out.merged_vcf.map { f -> ["6_cohort_merged${label_suffix}", f] })
+                    all_quality_evals = all_quality_evals.mix(MERGE_CONSENSUS_COHORT.out.merged_vcf.map { f -> ["6_cohort_merged", f] })
+                }
+
+                if (is_pathway_b) {
+                    // Pathway B: CatBoost (Analytical Validity) precedes Allele Frequency Filtering (Clinical Utility)
+                    // Stage 7: in silico Validated CNV Callset (CatBoost predictions on cohort-merged consensus)
+                    if (!params.skip_ml_training && params.get('truth_labels', false)) {
+                        def ch_catboost_vcfs = RUN_CATBOOST_PREDICT.out.predicted_vcfs.flatten().filter { f -> !f.name.endsWith('.tbi') && !f.name.endsWith('.csi') }
+                        all_evals = all_evals.mix(ch_catboost_vcfs.map { f -> ["7_insilico_validated${label_suffix}", f] })
+                        all_quality_evals = all_quality_evals.mix(ch_catboost_vcfs.map { f -> ["7_insilico_validated", f] })
+                    }
+
+                    // Stage 8: Internal Allele Frequency-Filtered CNV Callset (Rare Disease Diagnostic Track)
+                    if (!params.get('skip_cohort_merge', false) && !params.get('skip_af_filtering', false)) {
+                        all_evals = all_evals.mix(filterVcfByRareRegions.out.rare_vcf.map { run_name, f -> ["8_af_filtered${label_suffix}", f] })
+                        all_quality_evals = all_quality_evals.mix(filterVcfByRareRegions.out.rare_vcf.map { run_name, f -> ["8_af_filtered", f] })
+                    }
+                } else {
+                    // Pathway A: Allele Frequency Filtering precedes CatBoost
+                    // Stage 7: Internal Allele Frequency-Filtered CNV Callset
+                    if (!params.get('skip_cohort_merge', false) && !params.get('skip_af_filtering', false)) {
+                        all_evals = all_evals.mix(filterVcfByRareRegions.out.rare_vcf.map { run_name, f -> ["7_af_filtered${label_suffix}", f] })
+                        all_quality_evals = all_quality_evals.mix(filterVcfByRareRegions.out.rare_vcf.map { run_name, f -> ["7_af_filtered", f] })
+                    }
+
+                    // Stage 8: in silico Validated CNV Callset (CatBoost predictions)
+                    if (!params.skip_ml_training && params.get('truth_labels', false)) {
+                        def ch_catboost_vcfs = RUN_CATBOOST_PREDICT.out.predicted_vcfs.flatten().filter { f -> !f.name.endsWith('.tbi') && !f.name.endsWith('.csi') }
+                        all_evals = all_evals.mix(ch_catboost_vcfs.map { f -> ["8_insilico_validated${label_suffix}", f] })
+                        all_quality_evals = all_quality_evals.mix(ch_catboost_vcfs.map { f -> ["8_insilico_validated", f] })
+                    }
+                }
+
+                // Stage 9: Variant Annotated CNV Callset
+                all_evals = all_evals.mix(ch_annotated_vcf.map { run_name, f -> ["9_variant_annotated${label_suffix}", f] })
+                all_quality_evals = all_quality_evals.mix(ch_annotated_vcf.map { run_name, f -> ["9_variant_annotated", f] })
+
+                // Stage 10: ACMG_{4_5, 5, 4, 3, 2, 1, NA} CNV Callsets
+                def ch_acmg_eval = ch_acmg_vcfs.map { run_name, files -> files }.flatten().map { f ->
+                    def score = f.name.replaceAll(/^ACMG/, '').replaceAll(/\..*/, '')
+                    ["10_ACMG_${score}${label_suffix}", f]
+                }
+                def ch_acmg_qual = ch_acmg_vcfs.map { run_name, files -> files }.flatten().map { f ->
+                    def score = f.name.replaceAll(/^ACMG/, '').replaceAll(/\..*/, '')
+                    ["10_ACMG_${score}", f]
+                }
+                all_evals = all_evals.mix(ch_acmg_eval)
+                all_quality_evals = all_quality_evals.mix(ch_acmg_qual)
+            }
+
+            // Quality Metric Extraction across all 10 callsets
+            def probes_f_qual = params.get('probes_bed', params.get('probes', params.get('target_bed', false))) ? file(params.get('probes_bed', params.get('probes', params.get('target_bed')))) : file("${projectDir}/NO_BED")
+            def grouped_quality_inputs = all_quality_evals.groupTuple()
+            ASSESS_CALLSET_QUALITY_METRICS(grouped_quality_inputs, probes_f_qual)
+            COMPILE_ALL_STAGES_QUALITY_REPORT(ASSESS_CALLSET_QUALITY_METRICS.out.summary_file.collect())
+
+            // Performance Metric Evaluation (vs gold truth BED)
+            def comp_probes_path = params.probes_bed ?: params.probes ?: params.targets
+            if (params.get('truth_bed', false) && comp_probes_path) {
+                def truth_f = file(params.truth_bed)
+                def probes_f = file(comp_probes_path)
+                EVALUATE_COMPARATIVE(all_evals, truth_f, probes_f)
+                def comp_reports_ch = EVALUATE_COMPARATIVE.out.performance_reports.map { it instanceof List ? it[-1] : it }
+                GENERATE_ATTRITION_FUNNEL(comp_reports_ch.collect())
+            }
+}
+
 workflow {
     if (params.get('help', false)) {
         print_pipeline_help()
@@ -1201,639 +1867,7 @@ workflow {
         case['full']:
         case['local']:
         case['full_with_dragen']:
-            def caller_vcf_channels = []
-            def mergerMode = params.get('merger_mode', 'survivor')
-            def raw_vcfs_comp = Channel.empty()
-            def filtered_vcfs_comp = Channel.empty()
-            def normalised_vcfs_comp = Channel.empty()
-
-            def ch_samplesheet_bams = Channel.empty()
-            def ref_fa_common = file(params.get('ref', params.get('reference_fasta', params.get('fasta', ''))))
-            def ref_fai_common = file(params.get('fai', "${ref_fa_common}.fai"))
-
-            if (params.get('samplesheet_bams', false)) {
-                def ss_file = file(params.samplesheet_bams)
-                def first_row = ss_file.exists() ? ss_file.readLines().find { it.trim() && !it.startsWith('SampleID') } : null
-                if (first_row && (first_row.contains('.cram') || first_row.endsWith('.cram'))) {
-                    // CRAM paths supplied in samplesheet_bams: automatically convert on the fly!
-                    def ch_input_crams = Channel.fromPath(params.samplesheet_bams)
-                        .splitCsv(header: true, sep: '\t')
-                        .map { row -> [ "${row.SampleID}".replaceAll(/\\.md\$/, ''), file("${row.BAM}"), file("${row.BAM}.crai") ] }
-                    CONVERT_CRAM_TO_BAM_VERIFIED(ch_input_crams, ref_fa_common, ref_fai_common)
-                    ch_samplesheet_bams = CONVERT_CRAM_TO_BAM_VERIFIED.out.bam_and_index
-                } else {
-                    ch_samplesheet_bams = Channel.fromPath(params.samplesheet_bams)
-                        .splitCsv(header: true, sep: '\t')
-                        .map { row ->
-                            def sample_id = "${row.SampleID}".replaceAll(/\\.md\$/, '')
-                            def bam_file = file("${row.BAM}")
-                            def bai_path = row.BAI ?: (file("${row.BAM}.bai").exists() ? "${row.BAM}.bai" : "${row.BAM}".replaceAll(/\.bam$/, '.bai'))
-                            def bai_file = file(bai_path)
-                            [ sample_id, bam_file, bai_file ]
-                        }
-                }
-            } else if (params.get('samplesheet_crams', false)) {
-                // Automated CRAM-to-BAM on-the-fly conversion with 30 forensic verification gates
-                def ch_input_crams = Channel.fromPath(params.samplesheet_crams)
-                    .splitCsv(header: true, sep: '\t')
-                    .map { row -> [ "${row.SampleID}".replaceAll(/\\.md\$/, ''), file("${row.CRAM}"), file(row.CRAI ?: "${row.CRAM}.crai") ] }
-                def target_bed_for_slicing = params.get('target_bed', params.get('probes', params.get('exome_targets', params.get('targets', false))))
-                if (target_bed_for_slicing && !params.get('disable_target_slicing', false)) {
-                    CONVERT_CRAM_TO_TARGET_PADDED_BAM(ch_input_crams, ref_fa_common, ref_fai_common, file(target_bed_for_slicing))
-                    ch_samplesheet_bams = CONVERT_CRAM_TO_TARGET_PADDED_BAM.out.bam_and_index
-                } else {
-                    CONVERT_CRAM_TO_BAM_VERIFIED(ch_input_crams, ref_fa_common, ref_fai_common)
-                    ch_samplesheet_bams = CONVERT_CRAM_TO_BAM_VERIFIED.out.bam_and_index
-                }
-            }
-
-            def should_run_canoes = is_caller_enabled('canoes', workflow_mode)
-            if (should_run_canoes && (params.get('fai', false) || params.get('ref', false) || params.get('fasta', false)) && (params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false))) {
-                def chroms = (1..22).toList().collect { 'chr' + "${it}" }
-                def canoes_bam_list = ch_samplesheet_bams.collectFile() { item -> [ 'canoes_bam_list_unsorted.txt', "${item[1]}" + '\n' ] }
-                CANOES(canoes_bam_list, file(params.get('fai', "${ref_fa_common}.fai")), Channel.fromList(chroms))
-                def canoes_raw = CANOES.out.sorted_vcf.flatten()
-                raw_vcfs_comp = raw_vcfs_comp.mix(canoes_raw.map { f -> ["CANOES_raw", f] })
-                if (!params.get('skip_quality_filtering', false)) {
-                    FILTER_CANOES_FULL(Channel.of('CANOES_full').combine(canoes_raw.collect()))
-                    def canoes_filtered = FILTER_CANOES_FULL.out.filtered_data.map { it[2] }.flatten()
-                    filtered_vcfs_comp = filtered_vcfs_comp.mix(canoes_filtered.map { f -> ["CANOES_filtered", f] })
-                    if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
-                        NORM_CANOES_FULL(canoes_filtered, 'CANOES', 'out_CANOES')
-                        caller_vcf_channels << NORM_CANOES_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
-                        normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_CANOES_FULL.out.normalised_vcf.map { f -> ["CANOES", f] })
-                    } else {
-                        caller_vcf_channels << canoes_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
-                        normalised_vcfs_comp = normalised_vcfs_comp.mix(canoes_filtered.map { f -> ["CANOES", f] })
-                    }
-                } else {
-                    caller_vcf_channels << canoes_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
-                    normalised_vcfs_comp = normalised_vcfs_comp.mix(canoes_raw.map { f -> ["CANOES", f] })
-                }
-            }
-
-            def should_run_clamms = is_caller_enabled('clamms', workflow_mode)
-            if (should_run_clamms && (params.get('fai', false) || params.get('ref', false) || params.get('fasta', false)) && (params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false))) {
-                def clamms_sample_list = ch_samplesheet_bams.map { it -> it[0] + '\n' }.collectFile(name: 'clamms_sample_list.txt')
-                CLAMMS(ch_samplesheet_bams, file(params.get('fai', "${ref_fa_common}.fai")), clamms_sample_list)
-                def clamms_raw = CLAMMS.out.sorted_vcf.flatten()
-                raw_vcfs_comp = raw_vcfs_comp.mix(clamms_raw.map { f -> ["CLAMMS_raw", f] })
-                if (!params.get('skip_quality_filtering', false)) {
-                    FILTER_CLAMMS_FULL(Channel.of('CLAMMS_full').combine(clamms_raw.collect()))
-                    def clamms_filtered = FILTER_CLAMMS_FULL.out.filtered_data.map { it[2] }.flatten()
-                    filtered_vcfs_comp = filtered_vcfs_comp.mix(clamms_filtered.map { f -> ["CLAMMS_filtered", f] })
-                    if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
-                        NORM_CLAMMS_FULL(clamms_filtered, 'CLAMMS', 'out_CLAMMS')
-                        caller_vcf_channels << NORM_CLAMMS_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
-                        normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_CLAMMS_FULL.out.normalised_vcf.map { f -> ["CLAMMS", f] })
-                    } else {
-                        caller_vcf_channels << clamms_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
-                        normalised_vcfs_comp = normalised_vcfs_comp.mix(clamms_filtered.map { f -> ["CLAMMS", f] })
-                    }
-                } else {
-                    caller_vcf_channels << clamms_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
-                    normalised_vcfs_comp = normalised_vcfs_comp.mix(clamms_raw.map { f -> ["CLAMMS", f] })
-                }
-            }
-
-            def should_run_xhmm = is_caller_enabled('xhmm', workflow_mode)
-            if (should_run_xhmm && (params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false))) {
-                XHMM(ch_samplesheet_bams)
-                def xhmm_raw = XHMM.out.sorted_vcf.flatten()
-                raw_vcfs_comp = raw_vcfs_comp.mix(xhmm_raw.map { f -> ["XHMM_raw", f] })
-                if (!params.get('skip_quality_filtering', false)) {
-                    FILTER_XHMM_FULL(Channel.of('XHMM_full').combine(xhmm_raw.collect()))
-                    def xhmm_filtered = FILTER_XHMM_FULL.out.filtered_data.map { it[2] }.flatten()
-                    filtered_vcfs_comp = filtered_vcfs_comp.mix(xhmm_filtered.map { f -> ["XHMM_filtered", f] })
-                    if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
-                        NORM_XHMM_FULL(xhmm_filtered, 'XHMM', 'out_XHMM')
-                        caller_vcf_channels << NORM_XHMM_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
-                        normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_XHMM_FULL.out.normalised_vcf.map { f -> ["XHMM", f] })
-                    } else {
-                        caller_vcf_channels << xhmm_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
-                        normalised_vcfs_comp = normalised_vcfs_comp.mix(xhmm_filtered.map { f -> ["XHMM", f] })
-                    }
-                } else {
-                    caller_vcf_channels << xhmm_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
-                    normalised_vcfs_comp = normalised_vcfs_comp.mix(xhmm_raw.map { f -> ["XHMM", f] })
-                }
-            }
-
-            def should_run_cnvkit = is_caller_enabled('cnvkit', workflow_mode)
-            def cnvkit_targets_path = params.get('targets', params.get('exome_targets', params.get('probes', params.get('probes_bed', ''))))
-            def cnvkit_fasta_path = params.get('fasta', params.get('ref', params.get('reference_fasta', '')))
-            def has_cnvkit_inputs = should_run_cnvkit && (params.get('bams', false) || params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false)) && cnvkit_fasta_path && cnvkit_targets_path && params.get('refflat', false)
-
-            if (has_cnvkit_inputs) {
-                def ch_bams_cnvkit_resolved
-                if (params.get('bams', false)) {
-                    def glob_pattern_full = params.bams.contains('{') ? params.bams : params.bams.replaceAll(/\.bam$/, '.{bam,bai,bam.bai}')
-                    ch_bams_cnvkit_resolved = Channel.fromPath(glob_pattern_full)
-                        .map { it -> 
-                            def sample_id = it.name.replaceAll(/\.bam\.bai$/, '').replaceAll(/\.bam$/, '').replaceAll(/\.bai$/, '').replaceAll(/\.md$/, '')
-                            [sample_id, it] 
-                        }
-                        .groupTuple(size: 2)
-                        .map { id, files -> [id, files.find { it.extension == 'bam' }, files.find { it.extension == 'bai' }] }
-                        .ifEmpty { error "full workflow CNVkit step received no BAMs. Check the --bams parameter value matches existing BAM files." }
-                } else {
-                    ch_bams_cnvkit_resolved = ch_samplesheet_bams
-                }
-                CNVKIT(
-                    ch_bams_cnvkit_resolved,
-                    file(cnvkit_fasta_path),
-                    file(cnvkit_targets_path),
-                    file(params.refflat),
-                    ch_bams_cnvkit_resolved.first().map { it[1] }
-                )
-                def cnvkit_raw = CNVKIT.out.sorted_vcf.flatten()
-                raw_vcfs_comp = raw_vcfs_comp.mix(cnvkit_raw.map { f -> ["CNVKIT_raw", f] })
-                if (!params.get('skip_quality_filtering', false)) {
-                    FILTER_CNVKIT_FULL(Channel.of('CNVKIT_full').combine(cnvkit_raw.collect()))
-                    def cnvkit_filtered = FILTER_CNVKIT_FULL.out.filtered_data.map { it[2] }.flatten()
-                    filtered_vcfs_comp = filtered_vcfs_comp.mix(cnvkit_filtered.map { f -> ["CNVKIT_filtered", f] })
-                    if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
-                        NORM_CNVKIT_FULL(cnvkit_filtered, 'CNVKIT', 'out_CNVKIT')
-                        caller_vcf_channels << NORM_CNVKIT_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
-                        normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_CNVKIT_FULL.out.normalised_vcf.map { f -> ["CNVKIT", f] })
-                    } else {
-                        caller_vcf_channels << cnvkit_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
-                        normalised_vcfs_comp = normalised_vcfs_comp.mix(cnvkit_filtered.map { f -> ["CNVKIT", f] })
-                    }
-                } else {
-                    caller_vcf_channels << cnvkit_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
-                    normalised_vcfs_comp = normalised_vcfs_comp.mix(cnvkit_raw.map { f -> ["CNVKIT", f] })
-                }
-            }
-
-            def should_run_gatk = is_caller_enabled('gatk', workflow_mode)
-            def gatk_targets_path = params.get('exome_targets', params.get('targets', params.get('probes', params.get('probes_bed', ''))))
-            def gatk_fasta_path = params.get('fasta', params.get('ref', params.get('reference_fasta', '')))
-            def gatk_fai_path = params.get('fai', "${gatk_fasta_path}.fai")
-            def has_gatk_inputs = should_run_gatk && !params.skip_gcnv_training && (params.get('samples_path', false) || params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false)) && gatk_fasta_path && gatk_fai_path && params.get('dict', false) && gatk_targets_path
-
-            if (has_gatk_inputs) {
-                def ch_bams_gcnv_resolved
-                if (params.get('samples_path', false)) {
-                    ch_bams_gcnv_resolved = Channel.fromPath(params.samples_path)
-                        .filter { it.name.endsWith('.bam') || it.name.endsWith('.cram') }
-                        .map { it ->
-                            def index_fallback = [file("${it}.bai"), file("${it}.bam.bai"), file(it.toString().replaceAll(/\.bam$/, '.bai'))]
-                                .find { f -> f.exists() }
-                            def index_file = index_fallback ? index_fallback : (it.name.endsWith('.bam') ? file("${it}.bai") : file("${it}.crai"))
-                            return [ it.baseName.replaceAll(/\.md$/, ''), it, index_file ]
-                        }
-                } else {
-                    ch_bams_gcnv_resolved = ch_samplesheet_bams
-                }
-                GATK_GCNV(
-                    ch_bams_gcnv_resolved,
-                    file(gatk_fasta_path),
-                    file(gatk_fai_path),
-                    file(params.dict),
-                    file(gatk_targets_path)
-                )
-                def gcnv_raw = GATK_GCNV.out.sorted_vcf.flatten()
-                raw_vcfs_comp = raw_vcfs_comp.mix(gcnv_raw.map { f -> ["GCNV_raw", f] })
-                if (!params.get('skip_quality_filtering', false)) {
-                    def gcnv_probes_path = params.probes_bed ?: params.probes ?: params.targets ?: gatk_targets_path
-                    def gcnv_probes = file(gcnv_probes_path)
-                    FILTER_GCNV_FULL(Channel.of('GCNV_full').combine(gcnv_raw.collect()), gcnv_probes)
-                    def gcnv_filtered = FILTER_GCNV_FULL.out.filtered_data.map { it[2] }.flatten()
-                    filtered_vcfs_comp = filtered_vcfs_comp.mix(gcnv_filtered.map { f -> ["GCNV_filtered", f] })
-                    if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
-                        NORM_GCNV_FULL(gcnv_filtered, 'GATK', 'out_GCNV')
-                        caller_vcf_channels << NORM_GCNV_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
-                        normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_GCNV_FULL.out.normalised_vcf.map { f -> ["GCNV", f] })
-                    } else {
-                        caller_vcf_channels << gcnv_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
-                        normalised_vcfs_comp = normalised_vcfs_comp.mix(gcnv_filtered.map { f -> ["GCNV", f] })
-                    }
-                } else {
-                    caller_vcf_channels << gcnv_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
-                    normalised_vcfs_comp = normalised_vcfs_comp.mix(gcnv_raw.map { f -> ["GCNV", f] })
-                }
-            }
-
-            def should_run_dragen = is_caller_enabled('dragen', workflow_mode)
-            if (should_run_dragen && workflow_mode != 'local') {
-                if (params.get('cramFilePairsUploadPath', false)) {
-                    Channel.fromPath(params.cramFilePairsUploadPath, checkIfExists: true)
-                        .filter { f -> f.name.endsWith('.cram') || f.name.endsWith('.bam') }
-                        .map { primary ->
-                            def sampleId = primary.name.replaceAll(/\.(cram|bam)$/, '').replaceAll(/\.md$/, '')
-                            def idxCandidates = primary.name.endsWith('.cram')
-                                ? [file("${primary}.crai"), file(primary.toString().replaceAll(/\.cram$/, '.crai'))]
-                                : [file("${primary}.bai"), file("${primary}.bam.bai"), file(primary.toString().replaceAll(/\.bam$/, '.bai'))]
-                            def indexFile = idxCandidates.find { it.exists() }
-                            [sampleId, [primary, indexFile]]
-                        }
-                        .filter { sampleId, pair -> pair[1] != null }
-                        .ifEmpty { error "full workflow (DRAGEN path): no CRAM or BAM file pairs found in '${params.cramFilePairsUploadPath}'. Check that the path contains indexed CRAM/BAM files." }
-                        .set { ch_cramPairs_full_dragen }
-                    DRAGEN(ch_cramPairs_full_dragen)
-                    def dragen_raw = DRAGEN.out.sorted_vcf.flatten()
-                    raw_vcfs_comp = raw_vcfs_comp.mix(dragen_raw.map { f -> ["DRAGEN_raw", f] })
-                    if (!params.get('skip_quality_filtering', false)) {
-                        FILTER_DRAGEN_FULL(Channel.of('DRAGEN_full').combine(dragen_raw.collect()))
-                        def dragen_filtered = FILTER_DRAGEN_FULL.out.filtered_data.map { it[2] }.flatten()
-                        filtered_vcfs_comp = filtered_vcfs_comp.mix(dragen_filtered.map { f -> ["DRAGEN_filtered", f] })
-                        if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
-                            NORM_DRAGEN_FULL(dragen_filtered, 'DRAGEN', 'out_DRAGEN')
-                            caller_vcf_channels << NORM_DRAGEN_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
-                            normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_DRAGEN_FULL.out.normalised_vcf.map { f -> ["DRAGEN", f] })
-                        } else {
-                            caller_vcf_channels << dragen_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
-                            normalised_vcfs_comp = normalised_vcfs_comp.mix(dragen_filtered.map { f -> ["DRAGEN", f] })
-                        }
-                    } else {
-                        caller_vcf_channels << dragen_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
-                        normalised_vcfs_comp = normalised_vcfs_comp.mix(dragen_raw.map { f -> ["DRAGEN", f] })
-                    }
-                }
-            }
-
-            def should_run_exomedepth = is_caller_enabled('exomedepth', workflow_mode)
-            def exomedepth_probes_path = params.get('probes', params.get('targets', params.get('exome_targets', params.get('probes_bed', ''))))
-
-            if (should_run_exomedepth && (params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false)) && exomedepth_probes_path) {
-                def exomedepth_probes = file(exomedepth_probes_path)
-                def exomedepth_bam_list = ch_samplesheet_bams.collectFile() { item -> [ 'exomedepth_bam_list.txt', "${item[1]}" + '\n' ] }
-                EXOMEDEPTH(exomedepth_bam_list, exomedepth_probes, file(params.get('fai', "${ref_fa_common}.fai")))
-                def exomedepth_raw = EXOMEDEPTH.out.sorted_vcf.flatten()
-                raw_vcfs_comp = raw_vcfs_comp.mix(exomedepth_raw.map { f -> ["EXOMEDEPTH_raw", f] })
-                if (!params.get('skip_quality_filtering', false)) {
-                    FILTER_EXOMEDEPTH_FULL(Channel.of('EXOMEDEPTH_full').combine(exomedepth_raw.collect()))
-                    def exomedepth_filtered = FILTER_EXOMEDEPTH_FULL.out.filtered_data.map { it[2] }.flatten()
-                    filtered_vcfs_comp = filtered_vcfs_comp.mix(exomedepth_filtered.map { f -> ["EXOMEDEPTH_filtered", f] })
-                    if (!params.get('skip_normalisation', false) && !params.get('skip_quality_normalisation', false)) {
-                        NORM_EXOMEDEPTH_FULL(exomedepth_filtered, 'EXOMEDEPTH', 'out_EXOMEDEPTH')
-                        caller_vcf_channels << NORM_EXOMEDEPTH_FULL.out.normalised_vcf.map { f -> [extract_sample_id_from_vcf(f), f] }
-                        normalised_vcfs_comp = normalised_vcfs_comp.mix(NORM_EXOMEDEPTH_FULL.out.normalised_vcf.map { f -> ["EXOMEDEPTH", f] })
-                    } else {
-                        caller_vcf_channels << exomedepth_filtered.map { f -> [extract_sample_id_from_vcf(f), f] }
-                        normalised_vcfs_comp = normalised_vcfs_comp.mix(exomedepth_filtered.map { f -> ["EXOMEDEPTH", f] })
-                    }
-                } else {
-                    caller_vcf_channels << exomedepth_raw.map { f -> [extract_sample_id_from_vcf(f), f] }
-                    normalised_vcfs_comp = normalised_vcfs_comp.mix(exomedepth_raw.map { f -> ["EXOMEDEPTH", f] })
-                }
-            }
-
-
-
-            if (caller_vcf_channels.size() < 1) {
-                if (workflow_mode == 'dragen' || params.get('cramFilePairsUploadPath', false) || params.get('dragen_sv_dir', false)) {
-                    log.info "DRAGEN execution active without CNV caller output or 0 CNV callers configured. Bypassing consensus merging and evaluation."
-                } else {
-                    exit 1, "Error: workflow requires at least one CNV caller input. Please configure parameters for at least 1 caller."
-                }
-            }
-
-            def ch_intrasample_merged = Channel.empty()
-            def ch_intrasample_tbi = Channel.empty()
-            def ch_refined_intrasample = Channel.empty()
-            def ch_annotated_vcf = Channel.empty()
-            def ch_acmg_vcfs = Channel.empty()
-
-            if (caller_vcf_channels.size() >= 1) {
-                def ch_vcfs = caller_vcf_channels[0]
-                caller_vcf_channels.drop(1).each { ch_part ->
-                    ch_vcfs = ch_vcfs.mix(ch_part)
-                }
-
-                grouped_vcfs = group_caller_vcfs(ch_vcfs)
-
-                def bam_f       = params.get('bam_file',         false) ? file(params.bam_file)         : []
-                def fasta_f     = params.get('reference_fasta',  false) ? file(params.reference_fasta)  : []
-                def bed_f       = params.get('bed_file',         false) ? file(params.bed_file)         : []
-                def map_f       = params.get('mappability_file', false) ? file(params.mappability_file) : []
-
-                // -----------------------------------------------------------------------------
-                // CALLER-INDEPENDENT TARGET COVERAGE & LOG2 CALCULATION
-                // -----------------------------------------------------------------------------
-                def ch_coverage_cnn = Channel.empty()
-                def ch_cov_targets = bed_f ?: (params.get('probes_bed', params.get('probes', params.get('target_bed', false))) ? file(params.get('probes_bed', params.get('probes', params.get('target_bed')))) : [])
-
-                if (params.get('run_cnvkit', false)) {
-                    ch_coverage_cnn = CNVKIT.out.target_cov
-                } else if ((params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false)) && ch_cov_targets && file(ch_cov_targets.toString()).exists()) {
-                    COMPUTE_TARGET_COVERAGE(ch_samplesheet_bams, ch_cov_targets)
-                    ch_coverage_cnn = COMPUTE_TARGET_COVERAGE.out.coverage_cnn
-                }
-
-                // -----------------------------------------------------------------------------
-                // STAGE 5: INTRA-SAMPLE, INTER-TOOL MERGING (SURVIVOR or Truvari)
-                // -----------------------------------------------------------------------------
-                ch_intrasample_merged = Channel.empty()
-                ch_intrasample_tbi = Channel.empty()
-                if (mergerMode == 'truvari') {
-                    TRUVARI(grouped_vcfs)
-                    ch_intrasample_merged = TRUVARI.out.merged_vcf
-                    ch_intrasample_tbi = TRUVARI.out.merged_tbi
-                    feature_inputs_ch = TRUVARI.out.merged_vcf
-                        .join(TRUVARI.out.collapsed_vcf)
-                        .join(grouped_vcfs)
-                        .join(ch_coverage_cnn, remainder: true)
-                        .filter { item ->
-                            item.size() >= 4 && item[1] != null && item[1] != []
-                        }
-                        .map { item ->
-                            def sample_id     = item[0]
-                            def merged_vcf    = item[1]
-                            def collapsed_vcf = item[2]
-                            def vcfs          = item[3]
-                            def cov_file      = (item.size() > 4 && item[4] != null) ? item[4] : []
-                            [sample_id, merged_vcf, collapsed_vcf, build_tool_vcfs_str(vcfs), 'truvari',
-                             bam_f, fasta_f, bed_f, map_f, cov_file]
-                        }
-                } else {
-                    SURVIVOR(grouped_vcfs)
-                    ch_intrasample_merged = SURVIVOR.out.union_vcf
-                    ch_intrasample_tbi = SURVIVOR.out.union_tbi
-                    feature_inputs_ch = SURVIVOR.out.union_vcf
-                        .join(grouped_vcfs)
-                        .join(ch_coverage_cnn, remainder: true)
-                        .filter { item ->
-                            item.size() >= 3 && item[1] != null && item[1] != []
-                        }
-                        .map { item ->
-                            def sample_id  = item[0]
-                            def merged_vcf = item[1]
-                            def vcfs       = item[2]
-                            def cov_file   = (item.size() > 3 && item[3] != null) ? item[3] : []
-                            [sample_id, merged_vcf, [], build_tool_vcfs_str(vcfs), 'survivor',
-                             bam_f, fasta_f, bed_f, map_f, cov_file]
-                        }
-                }
-
-                // Optional SV Calling via SvABA if BAMs and target BED provided, or ingestion of DRAGEN SV calls
-                def ch_sv_vcfs = Channel.empty()
-                if (params.get('run_svaba', false) && (params.get('samplesheet_bams', false) || params.get('samplesheet_crams', false)) && params.get('fasta', false)) {
-                    SVABA(ch_samplesheet_bams, file(params.fasta), file(params.fai), file(params.get('exome_targets', params.get('probes_bed', ''))))
-                    ch_sv_vcfs = SVABA.out.sv_vcf
-                } else if (params.get('dragen_sv_dir', false)) {
-                    def dragen_sv_raw = Channel.fromPath("${params.dragen_sv_dir}/*.sv.vcf*")
-                        .filter { !it.name.endsWith('.tbi') && !it.name.endsWith('.csi') }
-                    BGZIP_SORT_INDEX_SV_VCF(dragen_sv_raw, 'DRAGEN', 'out_DRAGEN/sv_vcfs')
-                    ch_sv_vcfs = BGZIP_SORT_INDEX_SV_VCF.out.sv_vcf_tuple
-                }
-
-                // -----------------------------------------------------------------------------
-                // STAGE 6: POST-CONSENSUS BREAKPOINT REFINEMENT
-                // -----------------------------------------------------------------------------
-                ch_refined_intrasample = ch_intrasample_merged
-                if (params.get('run_refinement', true) && (params.get('run_svaba', false) || params.get('dragen_sv_dir', false))) {
-                    def ch_to_refine = ch_intrasample_merged.join(ch_intrasample_tbi).map { id, vcf, tbi -> [id, vcf, tbi] }
-                    REFINE_CONSENSUS_BREAKPOINTS(ch_to_refine.join(ch_sv_vcfs))
-                    ch_refined_intrasample = REFINE_CONSENSUS_BREAKPOINTS.out.refined_vcf.map { id, vcf, tbi -> [id, vcf] }
-                }
-
-                // -----------------------------------------------------------------------------
-                // OPTIONAL STAGE: HEADLESS IGV HTML VIEWER GENERATION
-                // -----------------------------------------------------------------------------
-                if (params.get('generate_igv_reports', false) || params.get('run_igv', false)) {
-                    def ch_igv_bams = ch_samplesheet_bams.map { id, bam, bai -> [id, bam, bai] }
-                    def ch_igv_inputs = ch_refined_intrasample.join(ch_igv_bams).map { id, vcf, bam, bai -> [id, vcf, bam, bai] }
-                    GENERATE_IGV_REPORT(ch_igv_inputs, ref_fa_common, ref_fai_common)
-                }
-
-                // -----------------------------------------------------------------------------
-                // STAGE 7: INTER-SAMPLE COHORT MERGING (SURVIVOR / Truvari)
-                // -----------------------------------------------------------------------------
-                def ch_cohort_merged = Channel.empty()
-                if (!params.get('skip_cohort_merge', false)) {
-                    MERGE_CONSENSUS_COHORT(ch_refined_intrasample.map { it[1] }.collect())
-                    ch_cohort_merged = Channel.of('full_cohort').combine(MERGE_CONSENSUS_COHORT.out.merged_vcf)
-                }
-
-                FEATURE_EXTRACTION(feature_inputs_ch)
-
-                if (!params.get('skip_cohort_merge', false)) {
-                    def ch_ref_fasta_db = params.get('fasta', params.get('reference_fasta', false)) ? file(params.get('fasta', params.get('reference_fasta'))) : file("${projectDir}/NO_FASTA")
-                    def ch_target_bed_db = params.get('probes_bed', params.get('target_bed', false)) ? file(params.get('probes_bed', params.get('target_bed'))) : file("${projectDir}/NO_BED")
-                    BUILD_COHORT_FEATURE_DATABASE(
-                        ch_cohort_merged,
-                        FEATURE_EXTRACTION.out.features_tsv.map { it[1] }.collect(),
-                        ch_ref_fasta_db,
-                        ch_target_bed_db
-                    )
-                }
-
-                def is_pathway_b = (params.get('ml_pathway', 'A') ?: 'A').toString().trim().equalsIgnoreCase('B')
-                def ch_af_filtered = Channel.empty()
-                def ch_catboost_predicted = Channel.empty()
-
-                if (!is_pathway_b) {
-                    // -------------------------------------------------------------------------
-                    // PATHWAY A (Default): AF Filtering -> CatBoost In Silico Prediction
-                    // -------------------------------------------------------------------------
-                    if (!params.get('skip_cohort_merge', false) && !params.get('skip_af_filtering', false)) {
-                        bcftoolsFlattenCohort(ch_cohort_merged)
-                        filterRareCnvs(bcftoolsFlattenCohort.out.cohort_tsv)
-                        def slice_joined = ch_cohort_merged.join(filterRareCnvs.out.rare_data)
-                        filterVcfByRareRegions(slice_joined.map { [ it[0], it[1], it[3] ] })
-                        ch_af_filtered = filterVcfByRareRegions.out.rare_vcf
-                    }
-
-                    if (params.skip_ml_training) {
-                        log.info "Skipping machine learning classifier training as requested (skip_ml_training = true)."
-                    } else {
-                        Channel.value(file(params.truth_labels))
-                            .set { ch_truth_full }
-                        def probesBedParamFull = params.get('probes_bed', false)
-                        Channel.value(probesBedParamFull ? file(probesBedParamFull) : [])
-                            .set { ch_probes_full }
-
-                        // Run CatBoost In Silico Prediction on AF-filtered VCF (or cohort merged if AF skipped)
-                        def vcfs_for_ml = (!params.get('skip_cohort_merge', false) && !params.get('skip_af_filtering', false)) ?
-                            ch_af_filtered.map { it[1] }.collect() :
-                            ch_cohort_merged.map { it[1] }.collect()
-
-                        RUN_CATBOOST_PREDICT(
-                            FEATURE_EXTRACTION.out.features_tsv.map { it[1] }.collect(),
-                            vcfs_for_ml,
-                            ch_truth_full,
-                            ch_probes_full
-                        )
-                        ch_catboost_predicted = RUN_CATBOOST_PREDICT.out.predicted_vcfs
-                    }
-                } else {
-                    // -------------------------------------------------------------------------
-                    // PATHWAY B: CatBoost In Silico Prediction -> AF Filtering
-                    // -------------------------------------------------------------------------
-                    if (params.skip_ml_training) {
-                        log.info "Skipping machine learning classifier training as requested (skip_ml_training = true)."
-                    } else {
-                        Channel.value(file(params.truth_labels))
-                            .set { ch_truth_full }
-                        def probesBedParamFull = params.get('probes_bed', false)
-                        Channel.value(probesBedParamFull ? file(probesBedParamFull) : [])
-                            .set { ch_probes_full }
-
-                        // Run CatBoost In Silico Prediction directly on cohort merged VCF
-                        def cohort_vcfs_for_ml = ch_cohort_merged.map { it[1] }.collect()
-                        RUN_CATBOOST_PREDICT(
-                            FEATURE_EXTRACTION.out.features_tsv.map { it[1] }.collect(),
-                            cohort_vcfs_for_ml,
-                            ch_truth_full,
-                            ch_probes_full
-                        )
-                        ch_catboost_predicted = RUN_CATBOOST_PREDICT.out.predicted_vcfs
-                    }
-
-                    if (!params.get('skip_cohort_merge', false) && !params.get('skip_af_filtering', false)) {
-                        def vcf_to_filter = (!params.skip_ml_training && params.get('truth_labels', false)) ?
-                            RUN_CATBOOST_PREDICT.out.predicted_vcfs.flatten().map { f -> ['full_cohort', f] } :
-                            ch_cohort_merged
-                        bcftoolsFlattenCohort(vcf_to_filter)
-                        filterRareCnvs(bcftoolsFlattenCohort.out.cohort_tsv)
-                        def slice_joined = vcf_to_filter.join(filterRareCnvs.out.rare_data)
-                        filterVcfByRareRegions(slice_joined.map { [ it[0], it[1], it[3] ] })
-                        ch_af_filtered = filterVcfByRareRegions.out.rare_vcf
-                    }
-                }
-
-                // -----------------------------------------------------------------------------
-                // STAGE 12 & 13: ANNOTSV VARIANT ANNOTATION & ACMG STRATIFICATION
-                // -----------------------------------------------------------------------------
-                ch_annotated_vcf = Channel.empty()
-                ch_acmg_vcfs = Channel.empty()
-                if (!params.get('skip_annotation', false) && params.get('annotsv_db', false)) {
-                    def annotsv_db_path = file(params.annotsv_db)
-                    def vcf_for_annotsv = is_pathway_b ?
-                        ((!params.get('skip_cohort_merge', false) && !params.get('skip_af_filtering', false)) ?
-                            ch_af_filtered :
-                            ((!params.skip_ml_training && params.get('truth_labels', false)) ?
-                                RUN_CATBOOST_PREDICT.out.predicted_vcfs.flatten().map { f -> ['full_cohort', f] } :
-                                ch_cohort_merged)) :
-                        ((!params.skip_ml_training && params.get('truth_labels', false)) ?
-                            RUN_CATBOOST_PREDICT.out.predicted_vcfs.flatten().map { f -> ['full_cohort', f] } :
-                            ((!params.get('skip_cohort_merge', false) && !params.get('skip_af_filtering', false)) ?
-                                ch_af_filtered :
-                                ch_cohort_merged))
-                    runAnnotSV(vcf_for_annotsv, annotsv_db_path)
-                    if (!params.get('skip_af_filtering', false)) {
-                        def acmg_joined = filterRareCnvs.out.rare_data.join(runAnnotSV.out.annotated_tsv)
-                        addACMGAnnotations(acmg_joined.map { [ it[0], it[1], it[3] ] })
-                        def vcf_acmg_joined = vcf_for_annotsv.join(runAnnotSV.out.annotated_tsv)
-                        stratifyVcfByAcmg(vcf_acmg_joined)
-                        ch_annotated_vcf = stratifyVcfByAcmg.out.annotated_vcf
-                        ch_acmg_vcfs = stratifyVcfByAcmg.out.acmg_vcfs
-
-                        // Quality assessment
-                        def resolved_eval_probes = file(params.probes_bed ?: params.probes ?: params.targets)
-                        def metrics_inputs = addACMGAnnotations.out.rare_cnvs_annotated
-                            .join(runAnnotSV.out.annotated_tsv)
-                            .combine(ch_refined_intrasample.map { it[1] }.collect().map { [ it ] })
-                            .map { run_id, rare_csv, annot_tsv, vcfs ->
-                                [ run_id, rare_csv, annot_tsv, vcfs ]
-                            }
-                        ANALYZE_CNV_QUALITY_METRICS(
-                            metrics_inputs,
-                            resolved_eval_probes
-                        )
-
-                        // ACMG Evaluators
-                        if (params.get('map_file', false) && params.get('truth_bed', false)) {
-                            def eval_inputs = addACMGAnnotations.out.score_separated_csvs.transpose()
-                            def eval_joined = eval_inputs.combine(Channel.of(resolved_eval_probes))
-                            EVALUATE_ACMG_CSV(
-                                eval_joined.map { [ it[0], it[1], it[2] ] },
-                                file(params.map_file),
-                                file(params.truth_bed)
-                            )
-                            PLOT_EVALUATION_METRICS(EVALUATE_ACMG_CSV.out.report.collect())
-                        }
-                    }
-                }
-            }
-
-            // -----------------------------------------------------------------------------
-            // MULTI-STAGE EVALUATION & QUALITY ASSESSMENT ACROSS ALL 10 CALLSETS
-            // -----------------------------------------------------------------------------
-            def qc_str = params.get('run_qc', false) ? "QC" : "NoQC"
-            def is_mosdepth = params.get('probes_bed', '').contains('mosdepth') || params.get('standard_bed', '').contains('mosdepth')
-            def bed_str = is_mosdepth ? "Mosdepth" : "Control"
-            def merger_str = mergerMode.toUpperCase()
-            def label_suffix = "_${bed_str}_${qc_str}_${merger_str}"
-
-            def all_evals = Channel.empty()
-            def all_quality_evals = Channel.empty()
-
-            // Stage 1: Raw CNV Callset
-            all_evals = all_evals.mix(raw_vcfs_comp.map { label, f -> ["1_raw_${label}${label_suffix}", f] })
-            all_quality_evals = all_quality_evals.mix(raw_vcfs_comp.map { label, f -> ["1_raw_${label}", f] })
-
-            // Stage 2: Quality-Filtered CNV Callset
-            all_evals = all_evals.mix(filtered_vcfs_comp.map { label, f -> ["2_quality_filtered_${label}${label_suffix}", f] })
-            all_quality_evals = all_quality_evals.mix(filtered_vcfs_comp.map { label, f -> ["2_quality_filtered_${label}", f] })
-
-            // Stage 3: Normalised CNV Callset
-            all_evals = all_evals.mix(normalised_vcfs_comp.map { label, f -> ["3_normalised_${label}${label_suffix}", f] })
-            all_quality_evals = all_quality_evals.mix(normalised_vcfs_comp.map { label, f -> ["3_normalised_${label}", f] })
-
-            if (caller_vcf_channels.size() >= 1) {
-                // Stage 4: Intra-Sample Inter-Tool Merged CNV Callset
-                all_evals = all_evals.mix(ch_intrasample_merged.map { sample_id, f -> ["4_merged_intrasample${label_suffix}", f] })
-                all_quality_evals = all_quality_evals.mix(ch_intrasample_merged.map { sample_id, f -> ["4_merged_intrasample", f] })
-
-                // Stage 5: Refined-Breakpoint CNV Callset
-                if (params.get('run_refinement', true) && (params.get('run_svaba', false) || params.get('dragen_sv_dir', false))) {
-                    all_evals = all_evals.mix(ch_refined_intrasample.map { sample_id, f -> ["5_refined_intrasample${label_suffix}", f] })
-                    all_quality_evals = all_quality_evals.mix(ch_refined_intrasample.map { sample_id, f -> ["5_refined_intrasample", f] })
-                }
-
-                // Stage 6: Inter-Sample Cohort Merged CNV Callset
-                if (!params.get('skip_cohort_merge', false)) {
-                    all_evals = all_evals.mix(MERGE_CONSENSUS_COHORT.out.merged_vcf.map { f -> ["6_cohort_merged${label_suffix}", f] })
-                    all_quality_evals = all_quality_evals.mix(MERGE_CONSENSUS_COHORT.out.merged_vcf.map { f -> ["6_cohort_merged", f] })
-                }
-
-                // Stage 7: Internal Allele Frequency-Filtered CNV Callset
-                if (!params.get('skip_cohort_merge', false) && !params.get('skip_af_filtering', false)) {
-                    all_evals = all_evals.mix(filterVcfByRareRegions.out.rare_vcf.map { run_name, f -> ["7_af_filtered${label_suffix}", f] })
-                    all_quality_evals = all_quality_evals.mix(filterVcfByRareRegions.out.rare_vcf.map { run_name, f -> ["7_af_filtered", f] })
-                }
-
-                // Stage 8: in silico Validated CNV Callset (CatBoost predictions)
-                if (!params.skip_ml_training && params.get('truth_labels', false)) {
-                    all_evals = all_evals.mix(RUN_CATBOOST_PREDICT.out.predicted_vcfs.flatten().map { f -> ["8_insilico_validated${label_suffix}", f] })
-                    all_quality_evals = all_quality_evals.mix(RUN_CATBOOST_PREDICT.out.predicted_vcfs.flatten().map { f -> ["8_insilico_validated", f] })
-                }
-
-                // Stage 9: Variant Annotated CNV Callset
-                all_evals = all_evals.mix(ch_annotated_vcf.map { run_name, f -> ["9_variant_annotated${label_suffix}", f] })
-                all_quality_evals = all_quality_evals.mix(ch_annotated_vcf.map { run_name, f -> ["9_variant_annotated", f] })
-
-                // Stage 10: ACMG_{4_5, 5, 4, 3, 2, 1, NA} CNV Callsets
-                def ch_acmg_eval = ch_acmg_vcfs.map { run_name, files -> files }.flatten().map { f ->
-                    def score = f.name.replaceAll(/^ACMG/, '').replaceAll(/\..*/, '')
-                    ["10_ACMG_${score}${label_suffix}", f]
-                }
-                def ch_acmg_qual = ch_acmg_vcfs.map { run_name, files -> files }.flatten().map { f ->
-                    def score = f.name.replaceAll(/^ACMG/, '').replaceAll(/\..*/, '')
-                    ["10_ACMG_${score}", f]
-                }
-                all_evals = all_evals.mix(ch_acmg_eval)
-                all_quality_evals = all_quality_evals.mix(ch_acmg_qual)
-            }
-
-            // Quality Metric Extraction across all 10 callsets
-            def probes_f_qual = params.get('probes_bed', params.get('probes', params.get('target_bed', false))) ? file(params.get('probes_bed', params.get('probes', params.get('target_bed')))) : file("${projectDir}/NO_BED")
-            def grouped_quality_inputs = all_quality_evals.groupTuple()
-            ASSESS_CALLSET_QUALITY_METRICS(grouped_quality_inputs, probes_f_qual)
-            COMPILE_ALL_STAGES_QUALITY_REPORT(ASSESS_CALLSET_QUALITY_METRICS.out.summary_file.collect())
-
-            // Performance Metric Evaluation (vs gold truth BED)
-            def comp_probes_path = params.probes_bed ?: params.probes ?: params.targets
-            if (params.get('truth_bed', false) && comp_probes_path) {
-                def truth_f = file(params.truth_bed)
-                def probes_f = file(comp_probes_path)
-                EVALUATE_COMPARATIVE(all_evals, truth_f, probes_f)
-                def comp_reports_ch = EVALUATE_COMPARATIVE.out.performance_reports.map { it instanceof List ? it[-1] : it }
-                GENERATE_ATTRITION_FUNNEL(comp_reports_ch.collect())
-            }
+            RUN_BENCHMARK_PIPELINE()
             break
 
         default:

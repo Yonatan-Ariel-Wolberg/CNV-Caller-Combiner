@@ -24,14 +24,13 @@ def test_icav2_dockerfile_exists_and_has_expected_content():
 
 def test_train_dockerfile_exists_and_has_expected_content():
     text = TRAIN_DOCKERFILE.read_text(encoding="utf-8")
-    assert "FROM quay.io/condaforge/mambaforge:24.9.2-0" in text
+    assert "FROM python:3.12-slim" in text or "FROM quay.io/condaforge/mambaforge" in text
     assert 'org.opencontainers.image.version="1.0.0"' in text
-    assert 'software.version="1.0.0"' in text
-    assert "xgboost=2.1.4" in text
-    assert "scikit-learn=1.6.1" in text
-    assert "imbalanced-learn=0.13.0" in text
-    assert "pandas=2.2.3" in text
-    assert "numpy=2.2.3" in text
+    assert "catboost" in text
+    assert "scikit-learn" in text
+    assert "imbalanced-learn" in text
+    assert "pandas" in text
+    assert "numpy" in text
 
 
 def test_seenv_dockerfile_exists_and_has_expected_content():

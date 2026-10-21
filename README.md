@@ -264,7 +264,10 @@ Below is an overview of the directory structure and the files contained within e
 ### 2. Subdirectories
 - **[bin/](file:///home/ywolberg/CNV-Caller-Combiner/bin/README.md)**: Production executables, R scripts, format converters, and quality metric extractors invoked during workflow steps. See [bin/README.md](file:///home/ywolberg/CNV-Caller-Combiner/bin/README.md).
 - **[modules/](file:///home/ywolberg/CNV-Caller-Combiner/modules/README.md)**: Atomic Nextflow DSL2 modules adhering to the Single Responsibility Principle (callers, ML, evaluation, filters, annotation, normalise, sample-qc, sv-mergers). See [modules/README.md](file:///home/ywolberg/CNV-Caller-Combiner/modules/README.md).
-- **[containers/](file:///home/ywolberg/CNV-Caller-Combiner/containers/)**: Container build recipes (Dockerfiles, Apptainer/Singularity `.def` definitions).
+- **[containers/](file:///home/ywolberg/CNV-Caller-Combiner/containers/)**: Container build recipes (Dockerfiles, Apptainer/Singularity `.def` definitions):
+  - ICAv2 CLI: `docker build -f containers/Dockerfile.icav2 -t ywolberg/cnv-caller-combiner:icav2-cli .`
+  - ML Train/Predict: `docker build -f containers/Dockerfile.train -t ywolberg/cnv-caller-combiner:catboost-train .`
+  - SeeNV Visualizer: `docker build -f containers/Dockerfile.seenv -t ywolberg/cnv-caller-combiner:seenv-visualizer .`
 - **[benchmarks/](file:///home/ywolberg/CNV-Caller-Combiner/benchmarks/README.md)**: Offline model exploration, multi-caller combination benchmarks, and publication visualization scripts. See [benchmarks/README.md](file:///home/ywolberg/CNV-Caller-Combiner/benchmarks/README.md).
 - **[scripts/](file:///home/ywolberg/CNV-Caller-Combiner/scripts/README.md)**: Automation and execution helper shell scripts. See [scripts/README.md](file:///home/ywolberg/CNV-Caller-Combiner/scripts/README.md).
 - **[params/](file:///home/ywolberg/CNV-Caller-Combiner/params/README.md)**: Configuration parameters in JSON format for the DDD UK and DDD Africa datasets. See [params/README.md](file:///home/ywolberg/CNV-Caller-Combiner/params/README.md).

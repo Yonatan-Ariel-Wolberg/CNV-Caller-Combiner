@@ -1,62 +1,56 @@
 # ==============================================================================
 # Dockerfile: Dockerfile.train
-# Description: Production-ready, security-hardened Docker image containing Python
-#              ML dependencies (catboost, xgboost, scikit-learn, etc.) for CNV classification.
-# Base Image:  Mambaforge (quay.io/condaforge/mambaforge:24.9.2-0)
-# Security:    Runs as non-root user (appuser, UID/GID 10001), cleaned package caches,
-#              permissive workspace mount point for HPC / Nextflow staging.
+# Description: Production-ready, security-hardened Docker container for CNV-Caller-Combiner
+#              Machine Learning Triage (CatBoost, Optuna, Scikit-learn, Pysam).
+# Base Image:  python:3.11-slim
 # ==============================================================================
 
-FROM quay.io/condaforge/mambaforge:24.9.2-0
+FROM python:3.12-slim
 
-# Use bash with pipefail for robust build execution
-SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
-
-# Runtime environment settings
-ENV LANG=C.UTF-8 \
+# Prevent interactive prompts during build
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=C.UTF-8 \
     LC_ALL=C.UTF-8 \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    WORKDIR=/workspace \
-    PATH=/opt/conda/envs/ml/bin:/opt/conda/bin:$PATH
+    PYTHONDONTWRITEBYTECODE=1
 
-# Metadata labels mapping to standard opencontainers and biocontainers schema
-LABEL org.opencontainers.image.title="catboost-train" \
-      org.opencontainers.image.description="ML model training and validation environment (CatBoost & XGBoost) for germline CNV calling" \
+# Metadata labels mapping to opencontainers specification
+LABEL org.opencontainers.image.title="catboost-optuna-train" \
+      org.opencontainers.image.description="ML model training, Bayesian tuning, and feature triage (CatBoost & Optuna) for germline CNV calling" \
       org.opencontainers.image.version="1.0.0" \
+      org.opencontainers.image.authors="Yonatan Wolberg" \
       org.opencontainers.image.licenses="BSD-3-Clause" \
-      org.opencontainers.image.source="https://github.com/Yonatan-Ariel-Wolberg/CNV-Caller-Combiner" \
-      software="catboost-train-deps" \
-      software.version="1.0.0" \
-      about.summary="Prebuilt image for nf-multicaller-exomecnv train workflow (CatBoost & XGBoost)" \
-      about.license="BSD-3-Clause" \
-      about.tags="catboost, xgboost, scikit-learn, imbalanced-learn, pandas, numpy, pysam"
+      org.opencontainers.image.source="https://github.com/Yonatan-Ariel-Wolberg/CNV-Caller-Combiner"
 
-# Install machine learning packages using mamba for rapid dependency resolution,
-# purge conda caches, create permissive workspace directory, and add non-root user.
-RUN mamba create -y -n ml -c conda-forge -c bioconda \
-      catboost \
-      pysam \
-      xgboost=2.1.4 \
-      scikit-learn=1.6.1 \
-      imbalanced-learn=0.13.0 \
-      pandas=2.2.3 \
-      numpy=2.2.3 \
-    && mamba clean -afy \
-    && rm -rf /root/.cache /tmp/* /var/tmp/* /opt/conda/pkgs/* \
-    && groupadd -g 10001 appuser \
-    && useradd -u 10001 -g 10001 -m -s /bin/bash appuser \
-    && mkdir -p /workspace \
-    && chown -R 10001:10001 /workspace \
-    && chmod 0777 /workspace \
-    && /opt/conda/envs/ml/bin/python3 -c "import catboost, xgboost, sklearn, imblearn, pandas, numpy, pysam; print('ML dependencies verified')"
+# Install build dependencies, C libraries for pysam and catboost, and procps for Nextflow resource tracking
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        libz-dev \
+        procps \
+        ca-certificates \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+# Install ML and Data Science dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+        catboost==1.2.10 \
+        optuna==5.0.0 \
+        xgboost==2.1.4 \
+        scikit-learn==1.6.1 \
+        imbalanced-learn>=0.12.0 \
+        pandas>=2.2.0 \
+        numpy>=1.26.0 \
+        pysam>=0.22.0 \
+        scipy>=1.13.0 \
+        matplotlib>=3.8.0
+
+# Open workspace directory with permissive permissions for Singularity/Docker container mounting
+RUN mkdir -p /workspace && chmod 0777 /workspace
+
 WORKDIR /workspace
 
-# Switch to non-root user (CIS Docker Benchmark 4.1)
-USER 10001:10001
+# Verify installation of all required modules
+RUN python3 -c "import catboost, optuna, xgboost, sklearn, imblearn, pandas, numpy, pysam, scipy, matplotlib; print('ML dependencies successfully verified!')"
 
-# Default command runs a quick verification of the ML stack
-CMD ["python3", "-c", "import catboost, xgboost, sklearn, imblearn, pandas, numpy, pysam; print('CNV CatBoost/ML environment ready')"]
-
+CMD ["python3", "-c", "import catboost, optuna; print('CatBoost & Optuna ML environment ready')"]
