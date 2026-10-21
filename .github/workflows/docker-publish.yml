@@ -58,9 +58,6 @@ jobs:
           tags: |
             ywolberg/cnv-caller-combiner:catboost-train-1.0.0
             ywolberg/cnv-caller-combiner:catboost-train
-            ywolberg/cnv-caller-combiner:catboost-optuna-train
-            ywolberg/cnv-caller-combiner:train-xgboost-1.0.0
-            ywolberg/cnv-caller-combiner:train-xgboost
 
       - name: Scan train image with Docker Scout
         uses: docker/scout-action@v1
